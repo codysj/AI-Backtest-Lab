@@ -487,7 +487,7 @@ GitHub Actions runs Python and frontend quality gates on every push and pull req
 | Stage | Commands |
 | --- | --- |
 | **Python** | `python -m pytest` · `python -m mypy backtester` |
-| **Frontend** | `npm ci` · `npm audit` · `npm run lint` · `npm run typecheck` · `npm run build` |
+| **Frontend** | `npm ci` · `npm audit --omit=dev --audit-level=high` · `npm run lint` · `npm run typecheck` · `npm run build` |
 
 Run the same gates locally:
 
@@ -502,7 +502,7 @@ cd frontend
 npm run lint
 npm run typecheck
 npm run build
-npm audit
+npm audit --omit=dev --audit-level=high
 ```
 
 Core tests use deterministic synthetic data where practical to avoid unnecessary network dependence. yfinance-backed CLI, API, and browser runs may require network access unless data is cached.

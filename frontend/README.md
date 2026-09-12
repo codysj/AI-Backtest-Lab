@@ -32,7 +32,7 @@ npm run build
 
 ## Dependency Security
 
-The project pins a stable Next.js 15 release and uses an npm override for Next's nested PostCSS dependency so `npm audit` remains clean without jumping to Next 16. Do not replace this with `npm audit fix --force` unless a future audit leaves no safe non-force path.
+The project pins a stable Next.js 15 release and uses an npm override for Next's nested PostCSS dependency. CI blocks on high/critical vulnerabilities in shipped dependencies with `npm audit --omit=dev --audit-level=high`; a full local `npm audit` can still be used to review development-tool findings. Do not use `npm audit fix --force` unless a reviewed upgrade leaves no safe non-force path.
 
 ## API Configuration
 

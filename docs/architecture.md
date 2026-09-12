@@ -382,12 +382,12 @@ The design system lives mostly in Tailwind classes plus `frontend/app/globals.cs
   - `BACKTESTER_AI_BASE_URL=https://openrouter.ai/api/v1`
   - `BACKTESTER_AI_APP_NAME=Backtest Lab`
 - AI provider keys are backend-only. The frontend receives draft statuses, warnings, unsupported items, and validation errors, never API keys.
-- CI is `.github/workflows/ci.yml`; it installs Python requirements, runs `python -m pytest`, runs `python -m mypy backtester`, installs frontend dependencies with `npm ci`, runs `npm audit`, runs `npm run lint`, runs `npm run typecheck`, and runs `npm run build`.
+- CI is `.github/workflows/ci.yml`; it installs Python requirements, runs `python -m pytest`, runs `python -m mypy backtester`, installs frontend dependencies with `npm ci`, audits shipped dependencies at high severity or above, runs `npm run lint`, runs `npm run typecheck`, and runs `npm run build`.
 
 ## Important Design Decisions
 
 - No domain-specific backtesting or finance metrics libraries are used.
-- Strategies use full DataFrame plus `current_index` for speed; look-ahead prevention is a strategy contract.
+- Strategy precomputation and decision calls receive history bounded at `current_index`; future bars are structurally unavailable during a decision.
 - Multi-asset backtests use inner-join date alignment for simplicity and predictable shared indexing.
 - Rejected orders return `None`; rejection is normal simulation behavior.
 - Cash is rounded to cents after trades; production-grade accounting would likely use `Decimal`.
