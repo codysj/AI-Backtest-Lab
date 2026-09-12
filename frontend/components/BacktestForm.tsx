@@ -2,7 +2,7 @@
 
 import { Play, RotateCcw, SlidersHorizontal } from "lucide-react";
 import { useMemo } from "react";
-import type { BacktestRequest, ConditionSpec, IndicatorSpec, PositionSizeMethod, StrategyId, StrategyMetadata } from "../lib/types";
+import type { BacktestRequest, ConditionSpec, ExecutionPolicy, IndicatorSpec, PositionSizeMethod, StrategyId, StrategyMetadata } from "../lib/types";
 import type { FormErrors } from "../lib/validation";
 
 type BacktestFormProps = {
@@ -200,6 +200,21 @@ export function BacktestForm({
       <div className="rounded-xl border border-lab-border bg-lab-surface p-4">
         <SectionHeading title="Portfolio" />
         <div className="space-y-3">
+          <label className="block">
+            <span className="text-sm font-medium text-lab-text">Execution Timing</span>
+            <select
+              value={request.execution_policy}
+              onChange={(event) => update("execution_policy", event.target.value as ExecutionPolicy)}
+              className="mt-2 w-full rounded-lg border border-lab-border bg-lab-bg px-3 py-2 text-sm text-lab-text outline-none transition focus:border-lab-blue focus:ring-2 focus:ring-lab-blue/20"
+            >
+              <option value="CLOSE_SIGNAL_NEXT_OPEN">Close signal → next open</option>
+              <option value="SAME_CLOSE">Same close (optimistic)</option>
+            </select>
+            <p className="mt-1 text-xs leading-5 text-lab-muted">
+              Signals use data through the current close. Next-open execution is the defensible default.
+            </p>
+          </label>
+
           <label className="block">
             <span className="text-sm font-medium text-lab-text">Initial Cash</span>
             <input

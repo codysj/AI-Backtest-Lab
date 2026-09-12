@@ -14,11 +14,15 @@ from backtester.api.schemas import (
     BacktestResponse,
     BacktestSeries,
     BacktestSummary,
+    DecisionSchema,
+    FillSchema,
     GridSearchRequest,
     GridSearchResponse,
     GridSearchRow,
     HeatmapPoint,
     OptimizationMetric,
+    OrderEventSchema,
+    OrderSchema,
     PricePoint,
     ResearchBaseRequest,
     RiskAnalytics,
@@ -134,6 +138,7 @@ def run_backtest_from_request(request: BacktestRequest) -> BacktestResponse:
         slippage_bps=request.slippage_bps,
         position_size_method=request.position_size_method,
         position_size_value=request.position_size_value,
+        execution_policy=request.execution_policy,
     )
     strategy = build_strategy(request.strategy, request.parameters, request.rule_spec)
     result = BacktestEngine(loader=loader, strategy=strategy, config=config).run()
@@ -149,6 +154,7 @@ def run_backtest_from_request(request: BacktestRequest) -> BacktestResponse:
             "initial_cash": config.initial_cash,
             "commission_rate": config.commission_rate,
             "slippage_bps": config.slippage_bps,
+            "execution_policy": config.execution_policy.value,
             "position_size_method": config.position_size_method.value,
             "position_size_value": config.position_size_value,
             "strategy": request.strategy,
@@ -180,6 +186,49 @@ def run_backtest_from_request(request: BacktestRequest) -> BacktestResponse:
             price=convert_price_data(price_data),
         ),
         trades=convert_trades(result.trades),
+        decisions=[
+            DecisionSchema(
+                decision_id=item.decision_id,
+                ticker=item.ticker,
+                signal=item.signal,
+                decision_time=item.decision_time.isoformat(),
+                information_cutoff=item.information_cutoff.isoformat(),
+            )
+            for item in result.decisions
+        ],
+        orders=[
+            OrderSchema(
+                order_id=item.order_id,
+                decision_id=item.decision_id,
+                ticker=item.ticker,
+                side=item.side.value,
+                quantity=item.quantity,
+                submitted_at=item.timestamp.isoformat(),
+            )
+            for item in result.orders
+        ],
+        fills=[
+            FillSchema(
+                order_id=item.order_id,
+                ticker=item.ticker,
+                side=item.side.value,
+                quantity=item.quantity,
+                reference_price=item.reference_price,
+                price=item.price,
+                commission=item.commission,
+                filled_at=item.filled_at.isoformat(),
+            )
+            for item in result.fills
+        ],
+        order_events=[
+            OrderEventSchema(
+                order_id=item.order_id,
+                status=item.status.value,
+                timestamp=item.timestamp.isoformat(),
+                reason=item.reason,
+            )
+            for item in result.order_events
+        ],
         risk=build_risk_analytics(result.equity_curve),
     )
 
@@ -575,6 +624,7 @@ def _backtest_config_from_research_request(
         slippage_bps=request.slippage_bps,
         position_size_method=request.position_size_method,
         position_size_value=request.position_size_value,
+        execution_policy=request.execution_policy,
     )
 
 
@@ -586,6 +636,7 @@ def _research_config(request: ResearchBaseRequest) -> dict[str, object]:
         "initial_cash": request.initial_cash,
         "commission_rate": request.commission_rate,
         "slippage_bps": request.slippage_bps,
+        "execution_policy": request.execution_policy.value,
         "position_size_method": request.position_size_method.value,
         "position_size_value": request.position_size_value,
         "strategy": request.strategy,

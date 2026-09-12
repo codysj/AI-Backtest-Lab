@@ -8,6 +8,8 @@ export type PositionSizeMethod =
   | "PERCENT_EQUITY"
   | "VOLATILITY_TARGET";
 
+export type ExecutionPolicy = "CLOSE_SIGNAL_NEXT_OPEN" | "SAME_CLOSE";
+
 export type StrategyParameter = {
   name: string;
   type: "integer" | "number";
@@ -31,6 +33,7 @@ export type BacktestRequest = {
   initial_cash: number;
   commission_rate: number;
   slippage_bps: number;
+  execution_policy: ExecutionPolicy;
   position_size_method: PositionSizeMethod;
   position_size_value: number;
   benchmark: boolean;
@@ -260,6 +263,41 @@ export type Trade = {
   timestamp: string;
 };
 
+export type Decision = {
+  decision_id: string;
+  ticker: string;
+  signal: "BUY" | "SELL" | "HOLD";
+  decision_time: string;
+  information_cutoff: string;
+};
+
+export type SubmittedOrder = {
+  order_id: string;
+  decision_id: string;
+  ticker: string;
+  side: "BUY" | "SELL";
+  quantity: number;
+  submitted_at: string;
+};
+
+export type Fill = {
+  order_id: string;
+  ticker: string;
+  side: "BUY" | "SELL";
+  quantity: number;
+  reference_price: number;
+  price: number;
+  commission: number;
+  filled_at: string;
+};
+
+export type OrderEvent = {
+  order_id: string;
+  status: "SUBMITTED" | "FILLED" | "REJECTED" | "EXPIRED";
+  timestamp: string;
+  reason: string;
+};
+
 export type BacktestResponse = {
   config: Record<string, unknown>;
   summary: BacktestSummary;
@@ -270,6 +308,10 @@ export type BacktestResponse = {
     price: PricePoint[];
   };
   trades: Trade[];
+  decisions: Decision[];
+  orders: SubmittedOrder[];
+  fills: Fill[];
+  order_events: OrderEvent[];
   risk: RiskAnalytics | null;
 };
 

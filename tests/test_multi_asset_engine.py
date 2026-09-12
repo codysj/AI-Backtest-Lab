@@ -115,7 +115,7 @@ def test_multi_asset_sell_liquidates_only_that_ticker() -> None:
 
     assert [trade.ticker for trade in result.trades] == ["AAA", "BBB", "AAA"]
     assert result.trades[-1].side.value == "SELL"
-    assert result.final_value == pytest.approx(10_200.0)
+    assert result.final_value == pytest.approx(10_000.0)
 
 
 def test_wrapper_applies_single_asset_strategy_independently() -> None:
@@ -129,4 +129,3 @@ def test_wrapper_applies_single_asset_strategy_independently() -> None:
     signals = wrapper.generate_signals(data, current_index=3)
 
     assert signals == {"AAA": Signal.BUY, "BBB": Signal.SELL}
-

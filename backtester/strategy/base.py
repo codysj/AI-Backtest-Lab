@@ -17,11 +17,10 @@ class Signal(Enum):
 class Strategy(ABC):
     """Abstract interface for one-bar-at-a-time strategy decisions.
 
-    Stage 7 optimizes the earlier sliced-DataFrame interface. ``data`` is now
-    the full OHLCV DataFrame and ``current_index`` marks the current bar.
-    Strategy implementations must not inspect rows after ``current_index``.
-    This removes per-bar DataFrame copies, but shifts look-ahead prevention
-    from structural enforcement to a documented strategy contract.
+    ``data`` is a bounded OHLCV history ending at ``current_index``. The engine
+    intentionally prevents decision code from reaching later bars. A future
+    read-only market-view abstraction may replace the bounded DataFrame without
+    relaxing this causal contract.
     """
 
     @property
@@ -37,9 +36,7 @@ class Strategy(ABC):
     def generate_signal(self, data: pd.DataFrame, current_index: int) -> Signal:
         """Return exactly one signal for ``current_index``.
 
-        ``data`` is the full DataFrame for performance. Implementations must
-        only use values at indices ``<= current_index`` to avoid look-ahead
-        bias.
+        ``data`` contains only values at indices ``<= current_index``.
         """
         ...
 
@@ -47,9 +44,8 @@ class Strategy(ABC):
 class MultiAssetStrategy(ABC):
     """Abstract interface for strategies that emit signals for many tickers.
 
-    ``data`` maps ticker symbols to aligned OHLCV DataFrames. The engine passes
-    full DataFrames for speed, and ``current_index`` marks the current shared
-    bar. Implementations must only use rows at indices ``<= current_index``.
+    ``data`` maps ticker symbols to aligned OHLCV histories bounded at the
+    current shared bar. ``current_index`` marks that final available row.
     Missing tickers in the returned mapping are treated as HOLD by the engine.
     """
 

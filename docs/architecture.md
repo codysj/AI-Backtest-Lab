@@ -74,12 +74,14 @@ The core package is intentionally modular. Data loading, strategies, portfolio s
 ### Single-Asset Python Backtest
 
 1. `DataLoader` fetches and validates OHLCV data.
-2. `BacktestEngine` initializes `Portfolio` and calls `strategy.precompute(data)`.
-3. For each bar, engine passes full `data` plus `current_index` to `strategy.generate_signal`.
-4. Engine converts signals into `Order`s.
-5. `Portfolio` executes accepted orders and records equity.
-6. Engine returns `BacktestResult`.
-7. Metrics, charts, CLI, API, or frontend consume the result.
+2. `BacktestEngine` initializes `Portfolio` and reads the open/close execution arrays.
+3. For each bar, the engine gives the strategy a copied history ending at that bar for feature precomputation and `generate_signal`; future rows are structurally unavailable.
+4. The engine records a `Decision` at the close and converts actionable signals into linked submitted `Order`s.
+5. Under the default `CLOSE_SIGNAL_NEXT_OPEN` policy, an order fills at the next available bar's open. The explicit `SAME_CLOSE` policy exists for assumption comparisons and is not the default.
+6. The engine records immutable order status events and linked `Fill`s; an order submitted on the final bar expires rather than filling without a later bar.
+7. `Portfolio` applies accepted fills and records post-fill equity valued at the current close.
+8. Engine returns `BacktestResult`, including decisions, orders, fills, status events, and the compatibility trade ledger.
+9. Metrics, charts, CLI, API, or frontend consume the result.
 
 ### Browser To API To Engine
 
@@ -98,6 +100,7 @@ The core package is intentionally modular. Data loading, strategies, portfolio s
    - Drawdown series
    - Price series
    - Executed trades
+   - Decisions, submitted orders, fills, and order status events
 9. Frontend renders KPI cards, Recharts equity/drawdown charts, result tabs, trades, metrics, and parameters.
 
 ### Natural-Language Strategy Draft And Compile Flow
@@ -209,6 +212,7 @@ FastAPI app: `backtester/api/main.py`
     - `initial_cash`
     - `commission_rate`
     - `slippage_bps`
+    - `execution_policy` (`CLOSE_SIGNAL_NEXT_OPEN` by default, or explicit `SAME_CLOSE`)
     - `position_size_method`
     - `position_size_value`
     - `benchmark`
@@ -222,6 +226,10 @@ FastAPI app: `backtester/api/main.py`
     - `series.drawdown`
     - `series.price`
     - `trades`
+    - `decisions`
+    - `orders`
+    - `fills`
+    - `order_events`
     - `risk`
 - `POST /api/grid-search`
   - Request schema:

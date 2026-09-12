@@ -44,6 +44,7 @@ class Portfolio:
         order: Order,
         fill_price: float,
         slippage_bps: float = 5.0,
+        fill_timestamp: datetime | None = None,
     ) -> Trade | None:
         """Execute an order or return None when it is normally rejected.
 
@@ -68,7 +69,7 @@ class Portfolio:
             quantity=order.quantity,
             price=actual_price,
             commission=commission,
-            timestamp=order.timestamp,
+            timestamp=fill_timestamp if fill_timestamp is not None else order.timestamp,
         )
 
         if order.side is Side.BUY:
@@ -143,4 +144,3 @@ class Portfolio:
         if side is Side.BUY:
             return fill_price * (1 + slippage_multiplier)
         return fill_price * (1 - slippage_multiplier)
-

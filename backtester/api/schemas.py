@@ -6,7 +6,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-from backtester.engine import PositionSizeMethod
+from backtester.engine import ExecutionPolicy, PositionSizeMethod
 from backtester.strategy.rule_schema import RuleBasedStrategySpec
 
 
@@ -66,6 +66,7 @@ class BacktestRequest(BaseModel):
     initial_cash: float = Field(default=100_000.0, gt=0)
     commission_rate: float = Field(default=0.001, ge=0)
     slippage_bps: float = Field(default=5.0, ge=0)
+    execution_policy: ExecutionPolicy = ExecutionPolicy.CLOSE_SIGNAL_NEXT_OPEN
     position_size_method: PositionSizeMethod = PositionSizeMethod.FIXED_DOLLAR
     position_size_value: float = Field(default=10_000.0, gt=0)
     benchmark: bool = True
@@ -126,6 +127,7 @@ class ResearchBaseRequest(BaseModel):
     initial_cash: float = Field(default=100_000.0, gt=0)
     commission_rate: float = Field(default=0.001, ge=0)
     slippage_bps: float = Field(default=5.0, ge=0)
+    execution_policy: ExecutionPolicy = ExecutionPolicy.CLOSE_SIGNAL_NEXT_OPEN
     position_size_method: PositionSizeMethod = PositionSizeMethod.FIXED_DOLLAR
     position_size_value: float = Field(default=10_000.0, gt=0)
     benchmark: bool = True
@@ -250,6 +252,49 @@ class TradeSchema(BaseModel):
     timestamp: str
 
 
+class DecisionSchema(BaseModel):
+    """A strategy decision and the latest information it could observe."""
+
+    decision_id: str
+    ticker: str
+    signal: str
+    decision_time: str
+    information_cutoff: str
+
+
+class OrderSchema(BaseModel):
+    """An order submitted from a strategy decision."""
+
+    order_id: str
+    decision_id: str
+    ticker: str
+    side: str
+    quantity: int
+    submitted_at: str
+
+
+class FillSchema(BaseModel):
+    """A fill linked to its submitted order."""
+
+    order_id: str
+    ticker: str
+    side: str
+    quantity: int
+    reference_price: float
+    price: float
+    commission: float
+    filled_at: str
+
+
+class OrderEventSchema(BaseModel):
+    """An order lifecycle transition."""
+
+    order_id: str
+    status: str
+    timestamp: str
+    reason: str
+
+
 class BacktestSeries(BaseModel):
     """All chart series returned for a backtest."""
 
@@ -266,6 +311,10 @@ class BacktestResponse(BaseModel):
     summary: BacktestSummary
     series: BacktestSeries
     trades: list[TradeSchema]
+    decisions: list[DecisionSchema] = Field(default_factory=list)
+    orders: list[OrderSchema] = Field(default_factory=list)
+    fills: list[FillSchema] = Field(default_factory=list)
+    order_events: list[OrderEventSchema] = Field(default_factory=list)
     risk: RiskAnalytics | None = None
 
 

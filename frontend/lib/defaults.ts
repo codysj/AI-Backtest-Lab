@@ -8,6 +8,7 @@ export const DEFAULT_BACKTEST_REQUEST: BacktestRequest = {
   initial_cash: 100000,
   commission_rate: 0.001,
   slippage_bps: 5,
+  execution_policy: "CLOSE_SIGNAL_NEXT_OPEN",
   position_size_method: "FIXED_DOLLAR",
   position_size_value: 10000,
   benchmark: true,
