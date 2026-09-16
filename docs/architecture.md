@@ -19,11 +19,11 @@ The core package is intentionally modular. Data loading, strategies, portfolio s
 - `backtester/agents/`
   - Defines a backend Research Copilot graph. It moves from natural-language goal interpretation to inert AI draft, validation, compile, approval gate, optional approved workflow execution, deterministic result analysis, and next-step recommendation through typed state transitions.
 - `backtester/strategy/`
-  - Defines `Strategy`, `MultiAssetStrategy`, `Signal`, built-in momentum and mean-reversion strategies, constrained rule DSL schemas, `RuleBasedStrategy`, and a wrapper for applying one single-asset strategy across multiple assets.
+  - Defines `Strategy`, `MultiAssetStrategy`, `Signal`, causal indicators, built-in SMA crossover, Bollinger mean reversion, RSI reversion, Donchian breakout, and MACD crossover strategies, the strategy registry, constrained rule DSL schemas, `RuleBasedStrategy`, and a wrapper for applying one single-asset strategy across multiple assets.
 - `backtester/portfolio/`
   - Defines `Order`, `Trade`, `Position`, and `Portfolio`. Tracks cash, positions, trade history, and equity curve.
 - `backtester/engine/`
-  - Contains single-asset and multi-asset engines, immutable configs, result dataclasses, and shared position sizing logic.
+  - Contains single-asset and multi-asset engines, immutable configs, result dataclasses, shared position sizing, and close-time protective exits.
 - `backtester/metrics/`
   - Computes returns, drawdowns, Sharpe/Sortino, alpha/beta, information ratio, profit factor, benchmark equity, and trade-level summaries.
 - `backtester/research/`
@@ -50,7 +50,10 @@ The core package is intentionally modular. Data loading, strategies, portfolio s
 - `DataLoader.fetch(ticker, start, end)` returns a cleaned OHLCV `DataFrame` with lowercase columns and `DatetimeIndex` named `date`.
 - `BacktestEngine.run()` runs one ticker with a `Strategy`.
 - `MultiAssetBacktestEngine.run()` runs multiple tickers with a `MultiAssetStrategy`.
-- `RuleBasedStrategy` evaluates Pydantic-validated rule specs over precomputed close, SMA, prior rolling high/low, and Bollinger band indicators without executing generated code.
+- `STRATEGIES` in `backtester/strategy/registry.py` maps strategy ids to metadata, typed parameters, default research grids, and factories. `StrategySpec.build()` is the single construction path for the API, CLI, research, and AI compiler.
+- `backtester/strategy/indicators.py` holds causal SMA, EMA, Wilder RSI, MACD, and prior high/low helpers shared by strategies and the rule DSL.
+- `risk_exit_reason()` in `backtester/engine/risk.py` decides stop-loss, take-profit, and trailing-stop exits from completed closes for both engines.
+- `RuleBasedStrategy` evaluates Pydantic-validated rule specs over precomputed indicators without executing generated code.
 - `Portfolio.execute_order()` applies slippage/commission and mutates cash/positions on accepted trades.
 - `generate_report()` computes primary performance metrics and optional benchmark comparison keys.
 - Additional metrics helpers compute rolling Sharpe, rolling volatility, rolling drawdown, drawdown duration, best/worst day, monthly returns, VaR, and CVaR from first principles.
@@ -76,9 +79,10 @@ The core package is intentionally modular. Data loading, strategies, portfolio s
 1. `DataLoader` fetches and validates OHLCV data.
 2. `BacktestEngine` initializes `Portfolio` and reads the open/close execution arrays.
 3. For each bar, the engine gives the strategy a copied history ending at that bar for feature precomputation and `generate_signal`; future rows are structurally unavailable.
-4. The engine records a `Decision` at the close and converts actionable signals into linked submitted `Order`s.
+4. The engine records a `Decision` at the close and converts actionable signals into linked submitted `Order`s. If an open position breaches a configured stop-loss, take-profit, or trailing stop at the close, the decision becomes a SELL and records the exit reason.
 5. Under the default `CLOSE_SIGNAL_NEXT_OPEN` policy, an order fills at the next available bar's open. The explicit `SAME_CLOSE` policy exists for assumption comparisons and is not the default.
-6. The engine records immutable order status events and linked `Fill`s; an order submitted on the final bar expires rather than filling without a later bar.
+6. The engine records immutable order status events and linked `Fill`s; an order submitted on the final bar expires rather than filling without a later bar. A buy that a price gap makes unaffordable is clipped to available cash, and the fill event records the reduction.
+   When `evaluation_start` is set, earlier bars only warm up indicators: they produce no orders and no equity points.
 7. `Portfolio` applies accepted fills and records post-fill equity valued at the current close.
 8. Engine returns `BacktestResult`, including decisions, orders, fills, status events, and the compatibility trade ledger.
 9. Metrics, charts, CLI, API, or frontend consume the result.
@@ -122,7 +126,7 @@ The core package is intentionally modular. Data loading, strategies, portfolio s
 
 1. Natural-language rule prompts are converted into `RuleBasedStrategySpec`, not Python code.
 2. The spec contains only enum-backed indicators and operators:
-   - indicators: `close`, `sma`, `rolling_high`, `rolling_low`, `bollinger_upper`, `bollinger_lower`
+   - indicators: `close`, `sma`, `ema`, `rsi`, `rolling_high`, `rolling_low`, `bollinger_upper`, `bollinger_lower`, and constant `value`
    - operators: `>`, `<`, `>=`, `<=`, `crosses_above`, `crosses_below`
 3. API schemas validate the nested `rule_spec` with `extra="forbid"` before strategy construction. AI provider normalization may translate one narrow indicator/conditions shape into this DSL, but only when every condition validates and no unused or unsupported indicators remain.
 4. `backtester/api/services.py` builds `RuleBasedStrategy` server-side from the structured spec.
@@ -181,7 +185,7 @@ The core package is intentionally modular. Data loading, strategies, portfolio s
 2. Frontend validates base config, parameter grid, optimization metric, and train/test/step bar windows.
 3. Browser submits `WalkForwardRequest` to `POST /api/walk-forward`.
 4. The API fetches the full single-asset price window once and slices train/test folds server-side.
-5. Each train fold runs grid search; the best train parameters are then evaluated on the following out-of-sample test fold.
+5. Each train fold runs grid search; the best train parameters are then evaluated on the following out-of-sample test fold. The test run starts at the train window so indicators are warm, but `evaluation_start` confines trading and scoring to the test window.
 6. The service returns selected parameters, train/test metrics, degradation ratios, fold warnings, aggregate averages, parameter stability, and overall warnings.
 7. Frontend renders a table-first validation view. It does not optimize, rank, or compute metrics in TypeScript.
 
@@ -215,6 +219,7 @@ FastAPI app: `backtester/api/main.py`
     - `execution_policy` (`CLOSE_SIGNAL_NEXT_OPEN` by default, or explicit `SAME_CLOSE`)
     - `position_size_method`
     - `position_size_value`
+    - optional `stop_loss_pct`, `take_profit_pct`, `trailing_stop_pct` as fractions between 0 and 1
     - `benchmark`
     - `parameters`
     - optional `rule_spec` for `strategy="rule_based"`
@@ -361,7 +366,7 @@ The design system lives mostly in Tailwind classes plus `frontend/app/globals.cs
 - Python dependencies are in `requirements.txt` and `pyproject.toml`; optional LangChain provider dependencies are in the `ai-langchain` extra and `requirements-ai-langchain.txt`.
 - LangGraph powers the backend-only Research Copilot graph and is listed with backend Python dependencies. The graph module imports it lazily; missing installations do not affect the rest of the backend, and direct graph construction reports a sanitized dependency error.
 - Tests are configured in `pyproject.toml` with `testpaths = ["tests"]`.
-- Mypy is configured strict for Python 3.11 in `pyproject.toml`.
+- Mypy is configured strict for Python 3.12 in `pyproject.toml`.
 - Frontend dependencies and scripts are in `frontend/package.json`.
 - Frontend optional env file: `frontend/.env.local`, based on `frontend/.env.example`.
 - API CORS currently allows:
@@ -389,7 +394,7 @@ The design system lives mostly in Tailwind classes plus `frontend/app/globals.cs
 - No domain-specific backtesting or finance metrics libraries are used.
 - Strategy precomputation and decision calls receive history bounded at `current_index`; future bars are structurally unavailable during a decision.
 - Multi-asset backtests use inner-join date alignment for simplicity and predictable shared indexing.
-- Rejected orders return `None`; rejection is normal simulation behavior.
+- `Portfolio.execute_order()` returns `None` for rejected orders; rejection is normal simulation behavior. Engines clip gap-affected buys to available cash before calling it.
 - Cash is rounded to cents after trades; production-grade accounting would likely use `Decimal`.
 - Backtest Lab is deliberately a single-asset API client even though the Python engine supports multi-asset backtests.
 - Frontend validation improves UX but does not replace API/Pydantic validation.
@@ -397,10 +402,3 @@ The design system lives mostly in Tailwind classes plus `frontend/app/globals.cs
 - AI strategy drafts are never executable code. Real-provider output is treated as untrusted JSON, may pass through only limited deterministic normalization, and must pass Pydantic schema validation plus `validator.py`; unexpected fields, raw-code fields, unsupported indicators/operators, unsupported strategy kinds, broker execution, live trading, intraday minute bars, options flow, sentiment feeds, filesystem/code loading, and multi-asset portfolios are surfaced as unsupported or clarification-needed for the v1 builder. OpenRouter support does not change this flow: draft JSON is validated, compiled only into existing API request payloads, and never executed automatically.
 - The Research Copilot graph preserves that same boundary. It can resume and run one existing workflow only after explicit matching approval. The API and frontend use request/response state passing only: no server-side session persistence, auth, database, broker integration, generated-code execution, or frontend API-key handling is added. Because the browser returns state to the approval endpoint, the backend treats the compiled payload as untrusted and validates it again before execution.
 - Backtest Lab favors the existing stack: Next.js, TypeScript, Tailwind CSS, Recharts, and small local components instead of heavy UI libraries.
-
-## Needs Confirmation
-
-- Whether to expose multi-asset backtesting in API, CLI, and Backtest Lab.
-- Whether generated dashboard screenshots should ever be committed; current policy is to regenerate them on demand.
-- Whether CLI should expose multi-asset backtesting.
-- Whether live yfinance examples should be replaced with fully synthetic defaults for all demo paths.

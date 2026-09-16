@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from pathlib import Path
 import sys
 
@@ -21,7 +22,8 @@ class SyntheticLoader(DataLoader):
     def fetch(self, ticker: str, start: str, end: str) -> pd.DataFrame:
         del ticker, start, end
         dates = pd.date_range("2020-01-01", periods=120, freq="B", name="date")
-        closes = [100.0 + index * 0.2 + (index % 15 - 7) * 0.4 for index in range(120)]
+        # A slow wave on a mild trend, so the 10/30 SMAs actually cross.
+        closes = [100.0 + index * 0.05 + 8.0 * math.sin(index / 9) for index in range(120)]
         return pd.DataFrame(
             {
                 "open": closes,
