@@ -8,6 +8,13 @@ Last documentation pass: 2026-05-08.
 - Clean OHLCV validation with schema `open`, `high`, `low`, `close`, `volume`.
 - Single-asset backtest engine.
 - Multi-asset backtest engine with intersection-based date alignment.
+- Explicit execution timing for both engines:
+  - close-derived decisions and submitted orders are distinct from fills
+  - `CLOSE_SIGNAL_NEXT_OPEN` is the default policy
+  - `SAME_CLOSE` remains an explicit comparison-only opt-in
+  - final-bar orders expire when no later execution bar exists
+  - result ledgers link decisions, orders, fills, and status events
+  - strategy decision calls receive history bounded at the current bar
 - Strategy interfaces:
   - `Strategy`
   - `MultiAssetStrategy`

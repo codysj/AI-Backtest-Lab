@@ -2,6 +2,13 @@
 
 ## Now
 
+- Execution-timing credibility pass completed:
+  - Single-asset and multi-asset engines separate close-time decisions, submitted orders, fills, and order lifecycle events.
+  - Default execution is the next available open; same-close execution is an explicit opt-in policy.
+  - Final-bar submissions expire instead of receiving an impossible fill.
+  - Strategy decision inputs are copied histories bounded at the current bar, with future-mutation regression coverage.
+  - API responses expose audit ledgers and the frontend request contract/configuration UI exposes execution timing.
+
 - Research Copilot hardening pass completed:
   - Approval now revalidates the browser-returned compiled payload against the existing API request schema immediately before execution.
   - Malformed or tampered approval payloads return sanitized field-level errors, clear the compiled payload from the returned state, and do not echo raw browser-supplied values.
@@ -46,9 +53,16 @@ The latest research-workstation batch added:
 
 ## Next
 
+- Execute the staged credibility roadmap in `docs/technical-roadmap.md`, beginning with golden accounting fixtures and explicit close-signal/next-open execution semantics before persistence, portfolio UI, or performance work.
+- Replace bounded DataFrame copies with a dedicated read-only market-view abstraction while preserving the new causal boundary, then add future-bar mutation tests for every built-in strategy.
+- Add a durable, idempotent research-job service with persisted attempts/trials, cancellation, progress, lease-based recovery, immutable input artifacts, and replayable provenance manifests.
+- Define and test raw/adjusted price, split, dividend, missing-bar, and stale-valuation policies before expanding data-dependent workflows.
+- Build an experiment registry with preserved failed trials, locked final holdouts, and documented selection-bias diagnostics before presenting optimized results as evidence.
+- Refactor multi-asset processing around simultaneous intents, portfolio allocation constraints, union-calendar tradability, and explicit stale valuation before exposing it through API and UI.
+- Compare the stable optimized engine against a simple reference simulator on identical event ledgers, then publish hardware, workload, memory, dispersion, correctness hashes, and attributable speedup.
 - Manually test Research Copilot with the API and frontend running together, then capture updated portfolio screenshots if desired.
 - Decide whether Research Copilot sessions need persistence only if a future durable audit or saved-run feature is explicitly requested.
-- Expose multi-asset backtesting through FastAPI if the dashboard roadmap needs it.
+- Expose multi-asset backtesting through FastAPI only after its timing, calendar, allocation, and accounting contracts satisfy the roadmap acceptance cases.
 - Expand the rule DSL only when there is a tested strategy intent contract for more indicators, OR composition, and research optimization.
 - Add multi-asset controls/results to Backtest Lab only after the API contract exists.
 - Add CLI support for multi-asset backtests.
@@ -56,7 +70,7 @@ The latest research-workstation batch added:
 - Add richer walk-forward charts once the table-first validation workflow has settled.
 - Add backend export endpoints only if frontend-side CSV/JSON export becomes insufficient.
 - Add a local Python interpreter/venv setup note or script for Windows workspaces where `python` is not on PATH.
-- Measure a pre-optimization benchmark baseline and update `docs/benchmark_results.md`.
+- Measure a reference-engine baseline and update `docs/benchmark_results.md` only after execution semantics stabilize; reconcile events, fills, cash, positions, and equity before publishing speedup.
 - Revisit AI Builder provider quality if OpenRouter free-model rate limits or availability become noisy during demos.
 - Improve AI Builder DSL prompting with more few-shot examples for rule-based drafts.
 - Add model-specific tests or notes for LangChain-backed providers if a demo model requires provider-specific structured-output tuning.

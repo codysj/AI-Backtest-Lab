@@ -16,6 +16,13 @@ class PositionSizeMethod(Enum):
     VOLATILITY_TARGET = "VOLATILITY_TARGET"
 
 
+class ExecutionPolicy(Enum):
+    """Timing policy used to turn close-derived decisions into fills."""
+
+    CLOSE_SIGNAL_NEXT_OPEN = "CLOSE_SIGNAL_NEXT_OPEN"
+    SAME_CLOSE = "SAME_CLOSE"
+
+
 @dataclass(frozen=True)
 class BacktestConfig:
     """Immutable configuration for a single backtest run."""
@@ -29,6 +36,7 @@ class BacktestConfig:
     position_size_method: PositionSizeMethod = PositionSizeMethod.FIXED_DOLLAR
     position_size_value: float = 10_000.0
     volatility_window: int = 20
+    execution_policy: ExecutionPolicy = ExecutionPolicy.CLOSE_SIGNAL_NEXT_OPEN
 
     def __post_init__(self) -> None:
         normalized_ticker = self.ticker.strip().upper()
@@ -72,6 +80,7 @@ class MultiAssetBacktestConfig:
     position_size_method: PositionSizeMethod = PositionSizeMethod.FIXED_DOLLAR
     position_size_value: float = 10_000.0
     volatility_window: int = 20
+    execution_policy: ExecutionPolicy = ExecutionPolicy.CLOSE_SIGNAL_NEXT_OPEN
 
     def __post_init__(self) -> None:
         normalized_tickers = [ticker.strip().upper() for ticker in self.tickers]

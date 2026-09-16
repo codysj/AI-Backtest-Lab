@@ -1119,7 +1119,9 @@ def test_compiled_rule_based_request_runs_through_service_path(monkeypatch) -> N
 
     assert response.config["strategy"] == "rule_based"
     assert response.config["rule_spec"] is not None
-    assert response.summary.total_trades == 2
+    # The final close-derived exit has no later open and therefore expires.
+    assert response.summary.total_trades == 1
+    assert response.order_events[-1].status == "EXPIRED"
 
 
 def test_mean_reversion_single_run_draft_compiles_into_backtest_request() -> None:

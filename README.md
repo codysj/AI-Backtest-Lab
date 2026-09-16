@@ -89,7 +89,7 @@ A bar-by-bar event-driven simulation with realistic portfolio accounting — KPI
 
 ![Single run](docs/demos/single_run.png)
 
-- Event-driven bar-by-bar simulation.
+- Event-driven bar-by-bar simulation with close-time decisions, linked order/fill ledgers, and next-available-open execution by default.
 - Pluggable strategy interfaces for single-asset and Python-side multi-asset workflows.
 - Built-in momentum SMA-crossover and mean-reversion strategies.
 - Rule-based strategy execution from a validated, non-executable DSL.
@@ -487,7 +487,7 @@ GitHub Actions runs Python and frontend quality gates on every push and pull req
 | Stage | Commands |
 | --- | --- |
 | **Python** | `python -m pytest` · `python -m mypy backtester` |
-| **Frontend** | `npm ci` · `npm audit` · `npm run lint` · `npm run typecheck` · `npm run build` |
+| **Frontend** | `npm ci` · `npm audit --omit=dev --audit-level=high` · `npm run lint` · `npm run typecheck` · `npm run build` |
 
 Run the same gates locally:
 
@@ -502,7 +502,7 @@ cd frontend
 npm run lint
 npm run typecheck
 npm run build
-npm audit
+npm audit --omit=dev --audit-level=high
 ```
 
 Core tests use deterministic synthetic data where practical to avoid unnecessary network dependence. yfinance-backed CLI, API, and browser runs may require network access unless data is cached.
@@ -524,12 +524,16 @@ Core tests use deterministic synthetic data where practical to avoid unnecessary
 
 ## Roadmap
 
-- Expose multi-asset backtests through FastAPI, CLI, and Backtest Lab.
-- Add persisted saved runs and research history.
-- Add richer walk-forward visualizations.
-- Add benchmark documentation with a measured pre-optimization baseline.
-- Expand the constrained rule DSL with additional indicators, OR logic, and grouped rules.
-- Add deployment configuration for a public demo environment.
+The detailed [technical roadmap](docs/technical-roadmap.md) prioritizes research credibility and reproducible evidence over feature count:
+
+1. Separate close-time decisions, order submissions, and next-open fills behind a structurally bounded history contract.
+2. Add durable research jobs, immutable input artifacts, provenance manifests, safe cancellation, and worker-restart recovery.
+3. Define and reconcile corporate actions, adjusted/raw data, missing observations, and historical availability.
+4. Preserve complete experiment histories, lock final holdouts, and report selection-bias diagnostics.
+5. Expose multi-asset portfolio research only after calendar, shared-cash, allocation, and stale-valuation semantics are explicit.
+6. Publish a measured optimization against a simple reference simulator with identical event and accounting outputs.
+
+Richer visualizations, DSL expansion, and deployment remain useful follow-ups, but they should not displace these correctness and reproducibility milestones.
 
 ---
 

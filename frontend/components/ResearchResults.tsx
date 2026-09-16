@@ -85,6 +85,7 @@ export function GridSearchResults({ result, isLoading, error, onRunSelected }: G
         initial_cash: Number(result.config.initial_cash),
         commission_rate: Number(result.config.commission_rate),
         slippage_bps: Number(result.config.slippage_bps),
+        execution_policy: (result.config.execution_policy ?? "CLOSE_SIGNAL_NEXT_OPEN") as BacktestRequest["execution_policy"],
         position_size_method: result.config.position_size_method as BacktestRequest["position_size_method"],
         position_size_value: Number(result.config.position_size_value),
         benchmark: Boolean(result.config.benchmark),

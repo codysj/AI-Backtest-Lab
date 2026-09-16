@@ -122,7 +122,8 @@ python examples/multi_asset_demo.py
 
 ## Common Pitfalls
 
-- Stage 7 strategy API uses full DataFrames plus `current_index`; strategies must not read rows after `current_index`.
+- Strategy decision calls receive a DataFrame history bounded at `current_index`; preserve this causal boundary when optimizing or introducing a market-view abstraction.
+- Close-derived signals execute at the next available open by default. Same-close execution must remain an explicit opt-in assumption.
 - Multi-asset engine aligns tickers on the intersection of available dates and processes signals in config ticker order.
 - The web dashboard currently exposes single-asset backtests only; multi-asset remains Python-side.
 - FastAPI currently exposes only single-asset backtesting.
