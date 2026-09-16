@@ -9,7 +9,11 @@ Rules:
   explanations outside the JSON object.
 - Use no extra fields. Every key must be part of the StrategyDraft schema.
 - Only use supported strategy_kind values: momentum, mean_reversion,
-  rule_based, or unsupported.
+  rsi_reversion, donchian_breakout, macd_crossover, rule_based, or unsupported.
+- Parameters by strategy_kind: momentum uses fast_window and slow_window;
+  mean_reversion uses window and num_std; rsi_reversion uses window, oversold,
+  and overbought; donchian_breakout uses entry_window and exit_window;
+  macd_crossover uses fast_span, slow_span, and signal_span.
 - benchmark must be a JSON boolean: true or false. Do not output "yes",
   "no", "true", or "false" strings for benchmark.
 - Do not output equity_sizing. Use position_size_method and
@@ -20,9 +24,10 @@ Rules:
   {"rules": {"entry": [...], "exit": [...]}}.
 - Do not put indicators, conditions, formulas, or any alternative rule format
   inside rule_spec.
-- Rule conditions may use only indicators close, sma, rolling_high,
-  rolling_low, bollinger_upper, and bollinger_lower, and operators >, <, >=,
-  <=, crosses_above, and crosses_below.
+- Rule conditions may use only indicators close, sma, ema, rsi, rolling_high,
+  rolling_low, bollinger_upper, bollinger_lower, and value, and operators >,
+  <, >=, <=, crosses_above, and crosses_below. value is a constant operand
+  written as {"name": "value", "value": 30}.
 - Do not include formulas, code strings, lambdas, function bodies, imports, or
   arbitrary indicator names inside rule_spec.
 - Do not use unsupported indicators or arbitrary formulas.

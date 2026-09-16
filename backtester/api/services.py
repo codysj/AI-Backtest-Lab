@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import math
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date, datetime
 from numbers import Real
+from typing import cast
 
 import pandas as pd
 
@@ -29,6 +31,7 @@ from backtester.api.schemas import (
     RobustnessAnalysis,
     SeriesPoint,
     StrategyMetadata,
+    StrategyId,
     StrategyParameterSchema,
     TradeSchema,
     WalkForwardFold,
@@ -52,7 +55,7 @@ from backtester.metrics import (
 )
 from backtester.portfolio import Trade
 from backtester.research import run_grid_search
-from backtester.strategy import MeanReversionStrategy, MomentumStrategy, RuleBasedStrategy, Strategy
+from backtester.strategy import STRATEGIES, RuleBasedStrategy, Strategy
 from backtester.strategy.rule_schema import RuleBasedStrategySpec
 
 
@@ -73,25 +76,27 @@ class StaticDataLoader(DataLoader):
 
 def available_strategies() -> list[StrategyMetadata]:
     """Return supported strategy metadata for the frontend."""
+    built_in = [
+        StrategyMetadata(
+            id=cast(StrategyId, spec.id),
+            name=spec.name,
+            description=spec.description,
+            parameters=[
+                StrategyParameterSchema(
+                    name=parameter.name,
+                    type=parameter.type,
+                    default=parameter.default,
+                    min=parameter.min,
+                    label=parameter.label,
+                    grid=list(parameter.grid),
+                )
+                for parameter in spec.parameters
+            ],
+        )
+        for spec in STRATEGIES.values()
+    ]
     return [
-        StrategyMetadata(
-            id="momentum",
-            name="Momentum SMA Crossover",
-            description="Uses fast and slow moving average crossovers to generate buy/sell signals.",
-            parameters=[
-                StrategyParameterSchema(name="fast_window", type="integer", default=10, min=1, label="Fast Window"),
-                StrategyParameterSchema(name="slow_window", type="integer", default=50, min=2, label="Slow Window"),
-            ],
-        ),
-        StrategyMetadata(
-            id="mean_reversion",
-            name="Mean Reversion",
-            description="Uses Bollinger-style bands to identify overextended prices.",
-            parameters=[
-                StrategyParameterSchema(name="window", type="integer", default=20, min=1, label="Window"),
-                StrategyParameterSchema(name="num_std", type="number", default=2.0, min=0.1, label="Standard Deviations"),
-            ],
-        ),
+        *built_in,
         StrategyMetadata(
             id="rule_based",
             name="Generated Rule-Based Strategy",
@@ -107,23 +112,15 @@ def build_strategy(
     rule_spec: RuleBasedStrategySpec | None = None,
 ) -> Strategy:
     """Build a Strategy instance from API request parameters."""
-    if strategy_id == "momentum":
-        return MomentumStrategy(
-            fast_window=int(parameters.get("fast_window", 10)),
-            slow_window=int(parameters.get("slow_window", 50)),
-        )
-    if strategy_id == "mean_reversion":
-        return MeanReversionStrategy(
-            window=int(parameters.get("window", 20)),
-            num_std=float(parameters.get("num_std", 2.0)),
-        )
     if strategy_id == "rule_based":
         if rule_spec is None:
             msg = "rule_spec is required for rule_based strategy."
             raise ValueError(msg)
         return RuleBasedStrategy(rule_spec)
-    msg = f"Unsupported strategy: {strategy_id}"
-    raise ValueError(msg)
+    if strategy_id not in STRATEGIES:
+        msg = f"Unsupported strategy: {strategy_id}"
+        raise ValueError(msg)
+    return STRATEGIES[strategy_id].build(parameters)
 
 
 def run_backtest_from_request(request: BacktestRequest) -> BacktestResponse:
@@ -139,6 +136,9 @@ def run_backtest_from_request(request: BacktestRequest) -> BacktestResponse:
         position_size_method=request.position_size_method,
         position_size_value=request.position_size_value,
         execution_policy=request.execution_policy,
+        stop_loss_pct=request.stop_loss_pct,
+        take_profit_pct=request.take_profit_pct,
+        trailing_stop_pct=request.trailing_stop_pct,
     )
     strategy = build_strategy(request.strategy, request.parameters, request.rule_spec)
     result = BacktestEngine(loader=loader, strategy=strategy, config=config).run()
@@ -157,6 +157,9 @@ def run_backtest_from_request(request: BacktestRequest) -> BacktestResponse:
             "execution_policy": config.execution_policy.value,
             "position_size_method": config.position_size_method.value,
             "position_size_value": config.position_size_value,
+            "stop_loss_pct": config.stop_loss_pct,
+            "take_profit_pct": config.take_profit_pct,
+            "trailing_stop_pct": config.trailing_stop_pct,
             "strategy": request.strategy,
             "parameters": request.parameters,
             "rule_spec": request.rule_spec.model_dump(mode="json") if request.rule_spec is not None else None,
@@ -193,6 +196,7 @@ def run_backtest_from_request(request: BacktestRequest) -> BacktestResponse:
                 signal=item.signal,
                 decision_time=item.decision_time.isoformat(),
                 information_cutoff=item.information_cutoff.isoformat(),
+                reason=item.reason,
             )
             for item in result.decisions
         ],
@@ -625,6 +629,9 @@ def _backtest_config_from_research_request(
         position_size_method=request.position_size_method,
         position_size_value=request.position_size_value,
         execution_policy=request.execution_policy,
+        stop_loss_pct=request.stop_loss_pct,
+        take_profit_pct=request.take_profit_pct,
+        trailing_stop_pct=request.trailing_stop_pct,
     )
 
 
@@ -639,6 +646,9 @@ def _research_config(request: ResearchBaseRequest) -> dict[str, object]:
         "execution_policy": request.execution_policy.value,
         "position_size_method": request.position_size_method.value,
         "position_size_value": request.position_size_value,
+        "stop_loss_pct": request.stop_loss_pct,
+        "take_profit_pct": request.take_profit_pct,
+        "trailing_stop_pct": request.trailing_stop_pct,
         "strategy": request.strategy,
         "parameter_grid": request.parameter_grid,
         "optimization_metric": request.optimization_metric,
@@ -646,13 +656,12 @@ def _research_config(request: ResearchBaseRequest) -> dict[str, object]:
     }
 
 
-def _strategy_factory(strategy_id: str) -> type[Strategy]:
-    if strategy_id == "momentum":
-        return MomentumStrategy
-    if strategy_id == "mean_reversion":
-        return MeanReversionStrategy
-    msg = f"Unsupported strategy: {strategy_id}"
-    raise ValueError(msg)
+def _strategy_factory(strategy_id: str) -> Callable[..., Strategy]:
+    spec = STRATEGIES.get(strategy_id)
+    if spec is None:
+        msg = f"Unsupported strategy: {strategy_id}"
+        raise ValueError(msg)
+    return lambda **parameters: spec.build(parameters)
 
 
 def _strategy_display_name(strategy_id: str) -> str:
@@ -662,7 +671,7 @@ def _strategy_display_name(strategy_id: str) -> str:
 
 def _row_parameters(row: pd.Series) -> dict[str, int | float]:
     parameters: dict[str, int | float] = {}
-    for key in ["fast_window", "slow_window", "window", "num_std"]:
+    for key in sorted({name for spec in STRATEGIES.values() for name in spec.parameter_names}):
         if key in row.index and not pd.isna(row[key]):
             value = row[key]
             if isinstance(value, Real):

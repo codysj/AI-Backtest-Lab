@@ -27,6 +27,9 @@ class StrategyKind(str, Enum):
 
     MOMENTUM = "momentum"
     MEAN_REVERSION = "mean_reversion"
+    RSI_REVERSION = "rsi_reversion"
+    DONCHIAN_BREAKOUT = "donchian_breakout"
+    MACD_CROSSOVER = "macd_crossover"
     RULE_BASED = "rule_based"
     UNSUPPORTED = "unsupported"
 

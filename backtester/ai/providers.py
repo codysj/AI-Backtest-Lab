@@ -26,6 +26,7 @@ from backtester.ai.schemas import (
 )
 from backtester.ai.validator import validate_strategy_draft
 from backtester.engine import PositionSizeMethod
+from backtester.strategy.registry import STRATEGIES
 from backtester.strategy.rule_schema import (
     ConditionOperator,
     ConditionSpec,
@@ -193,6 +194,12 @@ class FakeStrategyDraftProvider:
             return rule_based_draft
         if "mean reversion" in lowered:
             return self._mean_reversion_draft(prompt)
+        if re.search(r"\brsi\b", lowered):
+            return self._registry_draft(prompt, StrategyKind.RSI_REVERSION)
+        if "macd" in lowered:
+            return self._registry_draft(prompt, StrategyKind.MACD_CROSSOVER)
+        if "donchian" in lowered:
+            return self._registry_draft(prompt, StrategyKind.DONCHIAN_BREAKOUT)
         if "sma" in lowered or "crossover" in lowered or "moving average" in lowered:
             return self._momentum_draft(prompt)
 
@@ -200,7 +207,7 @@ class FakeStrategyDraftProvider:
             target_mode=TargetMode.UNSPECIFIED,
             strategy_kind=StrategyKind.UNSUPPORTED,
             warnings=["The request did not match a supported v1 strategy pattern."],
-            unsupported=["Only momentum SMA crossover and mean reversion drafts are supported in v1."],
+            unsupported=["Supported drafts: SMA crossover, mean reversion, RSI, MACD, Donchian breakout, or rule-based."],
             confidence=0.35,
             status=StrategyDraftStatus.NEEDS_CLARIFICATION,
         )
@@ -350,6 +357,26 @@ class FakeStrategyDraftProvider:
             warnings=[warning],
             confidence=0.45,
             status=StrategyDraftStatus.NEEDS_CLARIFICATION,
+        )
+
+    def _registry_draft(self, prompt: str, kind: StrategyKind) -> StrategyDraft:
+        """Draft a built-in strategy using its documented default parameters."""
+        start_date, end_date = _extract_date_range(prompt)
+        spec = STRATEGIES[kind.value]
+        return StrategyDraft(
+            target_mode=_target_mode_from_prompt(prompt),
+            ticker=_extract_ticker(prompt),
+            start_date=start_date,
+            end_date=end_date,
+            strategy_kind=kind,
+            parameters={parameter.name: parameter.default for parameter in spec.parameters},
+            assumptions=[
+                *_date_assumptions(start_date, end_date),
+                f"Standard {spec.name} parameters were assumed.",
+            ],
+            warnings=["Draft only. Review before compiling or running a backtest."],
+            confidence=0.7,
+            status=StrategyDraftStatus.READY,
         )
 
     def _mean_reversion_draft(self, prompt: str) -> StrategyDraft:
@@ -1255,7 +1282,7 @@ def _safe_provider_error(exc: ProviderRequestError) -> str:
 
 def _extract_ticker(prompt: str) -> str | None:
     matches = re.findall(r"\b[A-Z]{1,5}\b", prompt)
-    ignored = {"SMA", "ETF"}
+    ignored = {"SMA", "ETF", "RSI", "MACD", "EMA"}
     return next((match for match in matches if match not in ignored), None)
 
 

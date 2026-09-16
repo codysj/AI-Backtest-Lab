@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import pytest
 
-from backtester.cli import build_parser, parse_int_list
+from backtester.cli import build_parser, parse_assignment
 
 
-def test_parse_int_list() -> None:
-    assert parse_int_list("5,10, 20") == [5, 10, 20]
+def test_parse_assignment() -> None:
+    assert parse_assignment("entry_window=20, 55") == ("entry_window", [20.0, 55.0])
 
 
 def test_run_parser_accepts_required_arguments() -> None:

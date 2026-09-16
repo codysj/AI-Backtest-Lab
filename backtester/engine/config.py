@@ -33,10 +33,13 @@ class BacktestConfig:
     initial_cash: float = 100_000.0
     commission_rate: float = 0.001
     slippage_bps: float = 5.0
-    position_size_method: PositionSizeMethod = PositionSizeMethod.FIXED_DOLLAR
-    position_size_value: float = 10_000.0
+    position_size_method: PositionSizeMethod = PositionSizeMethod.PERCENT_EQUITY
+    position_size_value: float = 0.95
     volatility_window: int = 20
     execution_policy: ExecutionPolicy = ExecutionPolicy.CLOSE_SIGNAL_NEXT_OPEN
+    stop_loss_pct: float | None = None
+    take_profit_pct: float | None = None
+    trailing_stop_pct: float | None = None
 
     def __post_init__(self) -> None:
         normalized_ticker = self.ticker.strip().upper()
@@ -65,6 +68,7 @@ class BacktestConfig:
         if self.volatility_window <= 1:
             msg = "volatility_window must be greater than 1."
             raise ValueError(msg)
+        _validate_risk_exits(self.stop_loss_pct, self.take_profit_pct, self.trailing_stop_pct)
 
 
 @dataclass(frozen=True)
@@ -77,10 +81,13 @@ class MultiAssetBacktestConfig:
     initial_cash: float = 100_000.0
     commission_rate: float = 0.001
     slippage_bps: float = 5.0
-    position_size_method: PositionSizeMethod = PositionSizeMethod.FIXED_DOLLAR
-    position_size_value: float = 10_000.0
+    position_size_method: PositionSizeMethod = PositionSizeMethod.PERCENT_EQUITY
+    position_size_value: float = 0.95
     volatility_window: int = 20
     execution_policy: ExecutionPolicy = ExecutionPolicy.CLOSE_SIGNAL_NEXT_OPEN
+    stop_loss_pct: float | None = None
+    take_profit_pct: float | None = None
+    trailing_stop_pct: float | None = None
 
     def __post_init__(self) -> None:
         normalized_tickers = [ticker.strip().upper() for ticker in self.tickers]
@@ -112,3 +119,10 @@ class MultiAssetBacktestConfig:
         if self.volatility_window <= 1:
             msg = "volatility_window must be greater than 1."
             raise ValueError(msg)
+        _validate_risk_exits(self.stop_loss_pct, self.take_profit_pct, self.trailing_stop_pct)
+
+
+def _validate_risk_exits(*values: float | None) -> None:
+    if any(value is not None and not 0 < value < 1 for value in values):
+        msg = "stop_loss_pct, take_profit_pct, and trailing_stop_pct must be between 0 and 1."
+        raise ValueError(msg)

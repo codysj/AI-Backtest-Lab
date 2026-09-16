@@ -10,6 +10,7 @@ import pandas as pd
 
 from backtester.data.loader import DataLoader
 from backtester.engine.config import ExecutionPolicy, MultiAssetBacktestConfig
+from backtester.engine.risk import risk_exit_reason
 from backtester.engine.sizing import calculate_buy_quantity
 from backtester.portfolio import Decision, Fill, Order, OrderEvent, OrderStatus, Portfolio, Side, Trade
 from backtester.strategy import MultiAssetStrategy, Signal
@@ -73,6 +74,7 @@ class MultiAssetBacktestEngine:
         fills: list[Fill] = []
         order_events: list[OrderEvent] = []
         pending_orders: list[Order] = []
+        peak_closes: dict[str, float] = {}
 
         for current_index in range(len(shared_index)):
             timestamp = cast(datetime, timestamps[current_index])
@@ -100,12 +102,29 @@ class MultiAssetBacktestEngine:
 
             for ticker in self._config.tickers:
                 signal = signals.get(ticker, Signal.HOLD)
+                reason = ""
+                position = portfolio.get_position(ticker)
+                if position is None:
+                    peak_closes.pop(ticker, None)
+                else:
+                    close = current_prices[ticker]
+                    peak = max(peak_closes.get(ticker, 0.0), position.avg_entry_price, close)
+                    peak_closes[ticker] = peak
+                    exit_reason = risk_exit_reason(
+                        self._config,
+                        entry_price=position.avg_entry_price,
+                        peak_close=peak,
+                        close=close,
+                    )
+                    if exit_reason is not None and signal is not Signal.SELL:
+                        signal, reason = Signal.SELL, exit_reason
                 decision = Decision(
                     decision_id=f"D{current_index:08d}-{ticker}",
                     ticker=ticker,
                     signal=signal.name,
                     decision_time=timestamp,
                     information_cutoff=timestamp,
+                    reason=reason,
                 )
                 decisions.append(decision)
                 order = self._signal_to_order(

@@ -16,6 +16,9 @@ class IndicatorName(str, Enum):
     ROLLING_LOW = "rolling_low"
     BOLLINGER_UPPER = "bollinger_upper"
     BOLLINGER_LOWER = "bollinger_lower"
+    EMA = "ema"
+    RSI = "rsi"
+    VALUE = "value"
 
 
 class ConditionOperator(str, Enum):
@@ -34,6 +37,7 @@ class IndicatorSpec(BaseModel):
 
     ``rolling_high`` and ``rolling_low`` are evaluated over completed prior
     bars so breakout rules do not compare today's close with today's high/low.
+    ``value`` is a constant operand, for example ``rsi(14) < value(30)``.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -41,16 +45,32 @@ class IndicatorSpec(BaseModel):
     name: IndicatorName
     window: int | None = Field(default=None, gt=0)
     num_std: float | None = Field(default=None, gt=0)
+    value: float | None = None
 
     @model_validator(mode="after")
     def validate_indicator_parameters(self) -> "IndicatorSpec":
+        if self.name == IndicatorName.VALUE:
+            if self.value is None or self.window is not None or self.num_std is not None:
+                msg = "value requires value and does not accept window or num_std."
+                raise ValueError(msg)
+            return self
+        if self.value is not None:
+            msg = f"{self.name.value} does not accept value."
+            raise ValueError(msg)
+
         if self.name == IndicatorName.CLOSE:
             if self.window is not None or self.num_std is not None:
                 msg = "close does not accept window or num_std."
                 raise ValueError(msg)
             return self
 
-        if self.name in {IndicatorName.SMA, IndicatorName.ROLLING_HIGH, IndicatorName.ROLLING_LOW}:
+        if self.name in {
+            IndicatorName.SMA,
+            IndicatorName.EMA,
+            IndicatorName.RSI,
+            IndicatorName.ROLLING_HIGH,
+            IndicatorName.ROLLING_LOW,
+        }:
             if self.window is None:
                 msg = f"{self.name.value} requires window."
                 raise ValueError(msg)

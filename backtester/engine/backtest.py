@@ -10,6 +10,7 @@ import pandas as pd
 
 from backtester.data.loader import DataLoader
 from backtester.engine.config import BacktestConfig, ExecutionPolicy
+from backtester.engine.risk import risk_exit_reason
 from backtester.engine.sizing import calculate_buy_quantity
 from backtester.portfolio import Decision, Fill, Order, OrderEvent, OrderStatus, Portfolio, Side, Trade
 from backtester.strategy import Signal, Strategy
@@ -62,6 +63,7 @@ class BacktestEngine:
         fills: list[Fill] = []
         order_events: list[OrderEvent] = []
         pending_order: Order | None = None
+        peak_close = 0.0
 
         for i in range(len(data)):
             timestamp = cast(datetime, timestamps[i])
@@ -85,12 +87,27 @@ class BacktestEngine:
             history = data.iloc[: i + 1].copy()
             self._strategy.precompute(history)
             signal = self._strategy.generate_signal(history, current_index=i)
+            reason = ""
+            position = portfolio.get_position(self._config.ticker)
+            if position is None:
+                peak_close = 0.0
+            else:
+                peak_close = max(peak_close, position.avg_entry_price, current_price)
+                exit_reason = risk_exit_reason(
+                    self._config,
+                    entry_price=position.avg_entry_price,
+                    peak_close=peak_close,
+                    close=current_price,
+                )
+                if exit_reason is not None and signal is not Signal.SELL:
+                    signal, reason = Signal.SELL, exit_reason
             decision = Decision(
                 decision_id=f"D{i:08d}",
                 ticker=self._config.ticker,
                 signal=signal.name,
                 decision_time=timestamp,
                 information_cutoff=timestamp,
+                reason=reason,
             )
             decisions.append(decision)
             order = self._signal_to_order(
