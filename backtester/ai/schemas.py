@@ -27,6 +27,9 @@ class StrategyKind(str, Enum):
 
     MOMENTUM = "momentum"
     MEAN_REVERSION = "mean_reversion"
+    RSI_REVERSION = "rsi_reversion"
+    DONCHIAN_BREAKOUT = "donchian_breakout"
+    MACD_CROSSOVER = "macd_crossover"
     RULE_BASED = "rule_based"
     UNSUPPORTED = "unsupported"
 
@@ -73,8 +76,8 @@ class StrategyDraft(BaseModel):
     initial_cash: float | None = Field(default=100_000.0, gt=0)
     commission_rate: float | None = Field(default=0.001, ge=0)
     slippage_bps: float | None = Field(default=5.0, ge=0)
-    position_size_method: PositionSizeMethod | None = PositionSizeMethod.FIXED_DOLLAR
-    position_size_value: float | None = Field(default=10_000.0, gt=0)
+    position_size_method: PositionSizeMethod | None = PositionSizeMethod.PERCENT_EQUITY
+    position_size_value: float | None = Field(default=0.95, gt=0)
     strategy_kind: StrategyKind = StrategyKind.UNSUPPORTED
     parameters: dict[str, int | float] = Field(default_factory=dict)
     rule_spec: RuleBasedStrategySpec | None = None

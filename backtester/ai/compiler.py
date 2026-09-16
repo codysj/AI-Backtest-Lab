@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 from pydantic import ValidationError
 
@@ -23,6 +23,7 @@ from backtester.api.schemas import (
     WalkForwardRequest,
 )
 from backtester.engine import PositionSizeMethod
+from backtester.strategy.registry import STRATEGIES
 
 
 DEFAULT_START_DATE = "2020-01-01"
@@ -182,56 +183,37 @@ def _base_payload(draft: StrategyDraft) -> dict[str, Any]:
         "initial_cash": draft.initial_cash or 100_000.0,
         "commission_rate": draft.commission_rate if draft.commission_rate is not None else 0.001,
         "slippage_bps": draft.slippage_bps if draft.slippage_bps is not None else 5.0,
-        "position_size_method": draft.position_size_method or PositionSizeMethod.FIXED_DOLLAR,
-        "position_size_value": draft.position_size_value or 10_000.0,
+        "position_size_method": draft.position_size_method or PositionSizeMethod.PERCENT_EQUITY,
+        "position_size_value": draft.position_size_value or 0.95,
         "benchmark": draft.benchmark,
     }
 
 
 def _strategy_id(strategy_kind: StrategyKind) -> StrategyId:
-    if strategy_kind == StrategyKind.MOMENTUM:
-        return "momentum"
-    if strategy_kind == StrategyKind.MEAN_REVERSION:
-        return "mean_reversion"
     if strategy_kind == StrategyKind.RULE_BASED:
         return "rule_based"
-    raise DraftCompileError(f"Unsupported strategy kind: {strategy_kind.value}.")
+    return _research_strategy_id(strategy_kind)
 
 
 def _research_strategy_id(strategy_kind: StrategyKind) -> ResearchStrategyId:
-    if strategy_kind == StrategyKind.MOMENTUM:
-        return "momentum"
-    if strategy_kind == StrategyKind.MEAN_REVERSION:
-        return "mean_reversion"
     if strategy_kind == StrategyKind.RULE_BASED:
         raise DraftCompileError("rule_based drafts can only compile to single_run in v1.")
-    raise DraftCompileError(f"Unsupported strategy kind: {strategy_kind.value}.")
+    if strategy_kind.value not in STRATEGIES:
+        raise DraftCompileError(f"Unsupported strategy kind: {strategy_kind.value}.")
+    return cast(ResearchStrategyId, strategy_kind.value)
 
 
 def _parameters_for_single_run(draft: StrategyDraft) -> dict[str, int | float]:
-    if draft.strategy_kind == StrategyKind.MOMENTUM:
-        return {
-            "fast_window": _required_number(draft.parameters, "fast_window"),
-            "slow_window": _required_number(draft.parameters, "slow_window"),
-        }
-    if draft.strategy_kind == StrategyKind.MEAN_REVERSION:
-        return {
-            "window": _required_number(draft.parameters, "window"),
-            "num_std": _required_number(draft.parameters, "num_std"),
-        }
     if draft.strategy_kind == StrategyKind.RULE_BASED:
         return {}
-    raise DraftCompileError(f"Unsupported strategy kind: {draft.strategy_kind.value}.")
+    spec = STRATEGIES[_research_strategy_id(draft.strategy_kind)]
+    return {name: _required_number(draft.parameters, name) for name in sorted(spec.parameter_names)}
 
 
 def _parameter_grid_for_research(draft: StrategyDraft) -> dict[str, list[int | float]]:
     if draft.parameter_grid is not None:
         return draft.parameter_grid
-    if draft.strategy_kind == StrategyKind.MOMENTUM:
-        return {"fast_window": [5, 10, 20], "slow_window": [50, 100, 200]}
-    if draft.strategy_kind == StrategyKind.MEAN_REVERSION:
-        return {"window": [10, 20, 30], "num_std": [1.5, 2.0, 2.5]}
-    raise DraftCompileError(f"Unsupported strategy kind: {draft.strategy_kind.value}.")
+    return STRATEGIES[_research_strategy_id(draft.strategy_kind)].default_grid()
 
 
 def _compile_warnings(draft: StrategyDraft) -> list[str]:

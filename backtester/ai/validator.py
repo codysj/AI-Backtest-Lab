@@ -11,6 +11,7 @@ from backtester.ai.schemas import (
     StrategyKind,
     TargetMode,
 )
+from backtester.strategy.registry import STRATEGIES
 
 
 RAW_CODE_KEYS = frozenset(
@@ -76,6 +77,8 @@ def validate_strategy_draft(draft: StrategyDraft) -> StrategyDraftValidation:
         _validate_momentum_parameters(draft, errors)
     elif draft.strategy_kind == StrategyKind.MEAN_REVERSION:
         _validate_mean_reversion_parameters(draft, errors)
+    elif draft.strategy_kind.value in STRATEGIES:
+        _validate_registry_parameters(draft, errors)
     elif draft.strategy_kind == StrategyKind.RULE_BASED:
         _validate_rule_based_draft(draft, errors)
     else:
@@ -147,6 +150,20 @@ def _validate_mean_reversion_parameters(draft: StrategyDraft, errors: list[str])
             errors.append("num_std must be positive.")
     if draft.parameter_grid is not None:
         _validate_parameter_grid(draft.parameter_grid, {"window", "num_std"}, errors)
+
+
+def _validate_registry_parameters(draft: StrategyDraft, errors: list[str]) -> None:
+    spec = STRATEGIES[draft.strategy_kind.value]
+    if draft.parameters or draft.target_mode == TargetMode.SINGLE_RUN:
+        missing = sorted(spec.parameter_names - set(draft.parameters))
+        errors.extend(f"{name} is required." for name in missing)
+        if not missing:
+            try:
+                spec.build(draft.parameters)
+            except ValueError as exc:
+                errors.append(str(exc))
+    if draft.parameter_grid is not None:
+        _validate_parameter_grid(draft.parameter_grid, spec.parameter_names, errors)
 
 
 def _validate_rule_based_draft(draft: StrategyDraft, errors: list[str]) -> None:

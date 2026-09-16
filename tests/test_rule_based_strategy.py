@@ -143,7 +143,7 @@ def test_rule_based_strategy_does_not_look_ahead() -> None:
 
 def test_invalid_indicator_operator_and_window_are_rejected() -> None:
     with pytest.raises(ValidationError):
-        IndicatorSpec.model_validate({"name": "ema", "window": 10})
+        IndicatorSpec.model_validate({"name": "vwap", "window": 10})
 
     with pytest.raises(ValidationError):
         ConditionSpec.model_validate(

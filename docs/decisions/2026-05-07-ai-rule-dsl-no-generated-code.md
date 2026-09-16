@@ -23,4 +23,4 @@ The v1 DSL supports close, SMA, prior rolling high/low, and Bollinger upper/lowe
 - AI Builder can express more natural strategy ideas while preserving deterministic validation and review.
 - Model output remains untrusted data and must pass schema validation plus semantic validation before compilation.
 - Look-ahead prevention remains inside strategy implementation: `RuleBasedStrategy` uses only current and prior indicator values at `current_index`.
-- The first version is intentionally limited. EMA, RSI, arbitrary formulas, multi-asset rules, nested boolean logic, and rule-grid optimization require future design and tests before support.
+- The first version was intentionally limited. EMA, RSI, and constant operands were added on 2026-09-16 using the shared causal indicator module. Arbitrary formulas, multi-asset rules, nested boolean logic, and rule-grid optimization still require design and tests.

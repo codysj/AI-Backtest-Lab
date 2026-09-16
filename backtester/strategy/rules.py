@@ -9,6 +9,7 @@ import numpy as np
 from numpy.typing import NDArray
 import pandas as pd
 
+from backtester.strategy import indicators
 from backtester.strategy.base import Signal, Strategy
 from backtester.strategy.rule_schema import (
     ConditionOperator,
@@ -19,7 +20,7 @@ from backtester.strategy.rule_schema import (
 )
 
 
-IndicatorKey: TypeAlias = tuple[IndicatorName, int | None, float | None]
+IndicatorKey: TypeAlias = tuple[IndicatorName, int | None, float | None, float | None]
 
 
 class RuleBasedStrategy(Strategy):
@@ -109,14 +110,20 @@ def _compute_indicator(indicator: IndicatorSpec, data: pd.DataFrame) -> NDArray[
     close = data["close"]
     if indicator.name == IndicatorName.CLOSE:
         return close.to_numpy(dtype=float)
+    if indicator.name == IndicatorName.VALUE:
+        return np.full(len(data), float(indicator.value if indicator.value is not None else "nan"))
 
     window = _required_window(indicator)
     if indicator.name == IndicatorName.SMA:
-        return close.rolling(window).mean().to_numpy(dtype=float)
+        return indicators.sma(close, window).to_numpy(dtype=float)
+    if indicator.name == IndicatorName.EMA:
+        return indicators.ema(close, window).to_numpy(dtype=float)
+    if indicator.name == IndicatorName.RSI:
+        return indicators.rsi(close, window).to_numpy(dtype=float)
     if indicator.name == IndicatorName.ROLLING_HIGH:
-        return data["high"].rolling(window).max().shift(1).to_numpy(dtype=float)
+        return indicators.prior_high(data["high"], window).to_numpy(dtype=float)
     if indicator.name == IndicatorName.ROLLING_LOW:
-        return data["low"].rolling(window).min().shift(1).to_numpy(dtype=float)
+        return indicators.prior_low(data["low"], window).to_numpy(dtype=float)
 
     rolling_mean = close.rolling(window).mean()
     rolling_std = close.rolling(window).std()
@@ -131,7 +138,7 @@ def _compute_indicator(indicator: IndicatorSpec, data: pd.DataFrame) -> NDArray[
 
 
 def _indicator_key(indicator: IndicatorSpec) -> IndicatorKey:
-    return (indicator.name, indicator.window, indicator.num_std)
+    return (indicator.name, indicator.window, indicator.num_std, indicator.value)
 
 
 def _required_window(indicator: IndicatorSpec) -> int:

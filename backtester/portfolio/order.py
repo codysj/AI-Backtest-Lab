@@ -32,6 +32,7 @@ class Decision:
     signal: str
     decision_time: datetime
     information_cutoff: datetime
+    reason: str = ""
 
 
 @dataclass(frozen=True)

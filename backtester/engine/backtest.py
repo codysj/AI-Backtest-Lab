@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime
 from typing import cast
 
@@ -10,6 +10,7 @@ import pandas as pd
 
 from backtester.data.loader import DataLoader
 from backtester.engine.config import BacktestConfig, ExecutionPolicy
+from backtester.engine.risk import risk_exit_reason
 from backtester.engine.sizing import calculate_buy_quantity
 from backtester.portfolio import Decision, Fill, Order, OrderEvent, OrderStatus, Portfolio, Side, Trade
 from backtester.strategy import Signal, Strategy
@@ -57,13 +58,20 @@ class BacktestEngine:
         close_array = data["close"].to_numpy(dtype=float)
         open_array = data["open"].to_numpy(dtype=float)
         timestamps = pd.to_datetime(data.index).to_pydatetime()
+        first_bar = 0
+        if self._config.evaluation_start is not None:
+            first_bar = int(data.index.searchsorted(pd.Timestamp(self._config.evaluation_start)))
+            if first_bar >= len(data):
+                msg = "No bars on or after evaluation_start."
+                raise ValueError(msg)
         decisions: list[Decision] = []
         orders: list[Order] = []
         fills: list[Fill] = []
         order_events: list[OrderEvent] = []
         pending_order: Order | None = None
+        peak_close = 0.0
 
-        for i in range(len(data)):
+        for i in range(first_bar, len(data)):
             timestamp = cast(datetime, timestamps[i])
             current_price = float(close_array[i])
 
@@ -85,12 +93,27 @@ class BacktestEngine:
             history = data.iloc[: i + 1].copy()
             self._strategy.precompute(history)
             signal = self._strategy.generate_signal(history, current_index=i)
+            reason = ""
+            position = portfolio.get_position(self._config.ticker)
+            if position is None:
+                peak_close = 0.0
+            else:
+                peak_close = max(peak_close, position.avg_entry_price, current_price)
+                exit_reason = risk_exit_reason(
+                    self._config,
+                    entry_price=position.avg_entry_price,
+                    peak_close=peak_close,
+                    close=current_price,
+                )
+                if exit_reason is not None and signal is not Signal.SELL:
+                    signal, reason = Signal.SELL, exit_reason
             decision = Decision(
                 decision_id=f"D{i:08d}",
                 ticker=self._config.ticker,
                 signal=signal.name,
                 decision_time=timestamp,
                 information_cutoff=timestamp,
+                reason=reason,
             )
             decisions.append(decision)
             order = self._signal_to_order(
@@ -154,6 +177,15 @@ class BacktestEngine:
         fills: list[Fill],
         order_events: list[OrderEvent],
     ) -> None:
+        # Buys are sized at the decision close but fill at a later price. When a
+        # gap makes the order unaffordable, fill what cash covers instead of
+        # silently dropping the position.
+        reason = ""
+        if order.side is Side.BUY:
+            affordable = portfolio.affordable_quantity(reference_price, self._config.slippage_bps)
+            if 0 < affordable < order.quantity:
+                reason = f"Quantity reduced from {order.quantity} to {affordable} to fit available cash."
+                order = replace(order, quantity=affordable)
         trade = portfolio.execute_order(
             order,
             reference_price,
@@ -177,7 +209,7 @@ class BacktestEngine:
                 filled_at=trade.timestamp,
             )
         )
-        order_events.append(OrderEvent(order.order_id, OrderStatus.FILLED, timestamp))
+        order_events.append(OrderEvent(order.order_id, OrderStatus.FILLED, timestamp, reason))
 
     def _signal_to_order(
         self,

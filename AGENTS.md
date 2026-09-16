@@ -4,11 +4,12 @@ Durable instructions for Codex and other coding agents working in this repo.
 
 ## Project Snapshot
 
-- Backtester is a Python 3.11+ event-driven strategy backtesting engine with a FastAPI wrapper and a Next.js dashboard called Backtest Lab.
+- Backtester is a Python 3.12+ event-driven strategy backtesting engine with a FastAPI wrapper and a Next.js dashboard called Backtest Lab.
 - Core Python package is in `backtester/`; frontend source is isolated in `frontend/`.
-- The engine supports single-asset and multi-asset backtests, pluggable strategies, portfolio simulation, metrics, grid search, charts, CLI, and API responses.
-- FastAPI currently exposes health, strategy metadata, and single-asset backtest endpoints.
-- Backtest Lab currently exposes a polished single-asset research dashboard. Multi-asset support remains Python-side.
+- The engine supports single-asset and multi-asset backtests, pluggable strategies, protective exits, portfolio simulation, metrics, grid search, walk-forward validation, charts, CLI, and API responses.
+- Built-in strategies are defined once in `backtester/strategy/registry.py`. API validation, strategy metadata, CLI flags, research grids, and AI compilation read from it.
+- FastAPI exposes health, strategy metadata, backtest, grid-search, walk-forward, AI draft/compile, and Research Copilot plan/approve endpoints.
+- Backtest Lab is a single-asset research dashboard. Multi-asset support remains Python-side.
 - The project intentionally avoids backtesting-specific libraries such as backtrader, zipline, quantstats, and empyrical.
 - Core tests should remain deterministic and should not depend on live yfinance/network calls.
 
@@ -59,8 +60,8 @@ CLI/examples:
 
 ```bash
 python -m backtester.cli --help
-python -m backtester.cli run --ticker AAPL --strategy momentum --start 2020-01-01 --end 2023-12-31 --benchmark
-python -m backtester.cli grid-search --ticker AAPL --start 2020-01-01 --end 2023-12-31 --fast-windows 5,10 --slow-windows 30,50
+python -m backtester.cli run --ticker AAPL --strategy momentum --start 2020-01-01 --end 2023-12-31 --param fast_window=20 --benchmark
+python -m backtester.cli grid-search --ticker AAPL --start 2020-01-01 --end 2023-12-31 --strategy donchian_breakout --grid entry_window=20,55
 python examples/run_demo.py
 python examples/grid_search_demo.py
 python examples/multi_asset_demo.py
@@ -113,9 +114,10 @@ python examples/multi_asset_demo.py
 
 - `README.md` for user-facing overview and run commands.
 - `docs/architecture.md` for module map, data flow, and integration notes.
-- `docs/current-state.md` for current implementation state and verified commands.
-- `docs/tasks.md` for lightweight task tracking.
-- `docs/decisions/README.md` for ADR guidance.
+- `docs/current-state.md` for a one-page summary of what is implemented and known gaps.
+- `docs/tasks.md` for prioritized next work.
+- `docs/technical-roadmap.md` for the phased plan.
+- `docs/decisions/` for architecture decision records.
 - `frontend/README.md` for Backtest Lab-specific setup and component map.
 - `backtester/api/` for API contract and service conversion.
 - `frontend/app/`, `frontend/components/`, and `frontend/lib/` for dashboard implementation.
@@ -125,8 +127,9 @@ python examples/multi_asset_demo.py
 - Strategy decision calls receive a DataFrame history bounded at `current_index`; preserve this causal boundary when optimizing or introducing a market-view abstraction.
 - Close-derived signals execute at the next available open by default. Same-close execution must remain an explicit opt-in assumption.
 - Multi-asset engine aligns tickers on the intersection of available dates and processes signals in config ticker order.
-- The web dashboard currently exposes single-asset backtests only; multi-asset remains Python-side.
-- FastAPI currently exposes only single-asset backtesting.
+- The web dashboard and FastAPI workflows are single-asset; multi-asset remains Python-side.
+- To add a built-in strategy, add the class, add a registry entry, and extend the `StrategyId` literals in `backtester/api/schemas.py` and `frontend/lib/types.ts`. A test fails if the Python literal drifts from the registry.
+- Walk-forward test folds warm indicators with `BacktestConfig.evaluation_start`; keep scoring confined to the test window.
 - The frontend must call the API and render returned data; do not duplicate metrics or engine behavior in TypeScript.
 - yfinance calls may require network unless data is cached.
 - API CORS defaults to localhost/127.0.0.1 port 3000. Other frontend origins can be configured with `BACKTESTER_CORS_ORIGINS`.

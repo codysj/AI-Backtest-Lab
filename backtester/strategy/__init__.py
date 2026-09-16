@@ -4,6 +4,8 @@ from backtester.strategy.base import MultiAssetStrategy, Signal, Strategy
 from backtester.strategy.mean_reversion import MeanReversionStrategy
 from backtester.strategy.momentum import MomentumStrategy
 from backtester.strategy.multi_asset import SingleStrategyMultiAssetWrapper
+from backtester.strategy.oscillators import DonchianBreakoutStrategy, MacdCrossoverStrategy, RsiReversionStrategy
+from backtester.strategy.registry import STRATEGIES, ParameterSpec, StrategySpec
 from backtester.strategy.rule_schema import (
     ConditionOperator,
     ConditionSpec,
@@ -15,6 +17,12 @@ from backtester.strategy.rule_schema import (
 from backtester.strategy.rules import RuleBasedStrategy
 
 __all__ = [
+    "STRATEGIES",
+    "DonchianBreakoutStrategy",
+    "MacdCrossoverStrategy",
+    "ParameterSpec",
+    "RsiReversionStrategy",
+    "StrategySpec",
     "ConditionOperator",
     "ConditionSpec",
     "IndicatorName",

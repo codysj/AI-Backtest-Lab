@@ -264,10 +264,13 @@ export default function HomePage() {
           </p>
         </section>
         <section className="rounded-xl border border-lab-border bg-lab-surface p-4">
-          <h3 className="text-xs font-semibold uppercase tracking-[0.18em] text-lab-secondary">Supported V1</h3>
+          <h3 className="text-xs font-semibold uppercase tracking-[0.18em] text-lab-secondary">Supported</h3>
           <ul className="mt-3 space-y-2 text-sm text-lab-secondary">
-            <li>Momentum SMA crossover</li>
-            <li>Mean reversion bands</li>
+            {strategies
+              .filter((strategy) => strategy.id !== "rule_based")
+              .map((strategy) => (
+                <li key={strategy.id}>{strategy.name}</li>
+              ))}
             {mode === "ai" ? <li>Constrained rule-based single runs</li> : null}
             <li>Single Run, Grid Search, and Walk-Forward handoff</li>
             {mode === "copilot" ? <li>Explicit approval before backend execution</li> : null}

@@ -44,7 +44,7 @@ def run_grid_search(
         try:
             strategy = strategy_factory(**params)
             result = BacktestEngine(loader=loader, strategy=strategy, config=config).run()
-            price_data = loader.fetch(config.ticker, config.start_date, config.end_date)
+            price_data = loader.fetch(config.ticker, config.evaluation_start or config.start_date, config.end_date)
             benchmark_equity = buy_and_hold_equity(price_data, config.initial_cash) if benchmark else None
             report = generate_report(result, risk_free_rate=risk_free_rate, benchmark_equity=benchmark_equity)
             row.update(

@@ -10,6 +10,7 @@ import type {
   WalkForwardRequest
 } from "../lib/types";
 import type { FormErrors } from "../lib/validation";
+import { RiskExitFields } from "./RiskExitFields";
 
 type SharedProps = {
   strategies: StrategyMetadata[];
@@ -65,11 +66,8 @@ function rangeText(values: number[] | undefined): string {
   return (values ?? []).join(", ");
 }
 
-function strategyGrid(strategyId: ResearchStrategyId): Record<string, number[]> {
-  if (strategyId === "momentum") {
-    return { fast_window: [5, 10, 15], slow_window: [30, 50, 80] };
-  }
-  return { window: [10, 20, 30], num_std: [1.5, 2, 2.5] };
+function strategyGrid(strategy: StrategyMetadata | undefined): Record<string, number[]> {
+  return Object.fromEntries((strategy?.parameters ?? []).map((parameter) => [parameter.name, parameter.grid ?? [parameter.default]]));
 }
 
 function BaseResearchFields<T extends GridSearchRequest | WalkForwardRequest>({
@@ -86,7 +84,7 @@ function BaseResearchFields<T extends GridSearchRequest | WalkForwardRequest>({
   }
 
   function changeStrategy(strategy: ResearchStrategyId) {
-    onChange({ ...request, strategy, parameter_grid: strategyGrid(strategy) });
+    onChange({ ...request, strategy, parameter_grid: strategyGrid(strategies.find((item) => item.id === strategy)) });
   }
 
   function updateRange(name: string, value: string) {
@@ -256,6 +254,8 @@ function BaseResearchFields<T extends GridSearchRequest | WalkForwardRequest>({
           </label>
         </div>
       </div>
+
+      <RiskExitFields value={request} errors={errors} onChange={(exits) => onChange({ ...request, ...exits })} />
     </>
   );
 }

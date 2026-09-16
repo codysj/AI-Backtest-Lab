@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime
 from typing import cast
 
@@ -10,6 +10,7 @@ import pandas as pd
 
 from backtester.data.loader import DataLoader
 from backtester.engine.config import ExecutionPolicy, MultiAssetBacktestConfig
+from backtester.engine.risk import risk_exit_reason
 from backtester.engine.sizing import calculate_buy_quantity
 from backtester.portfolio import Decision, Fill, Order, OrderEvent, OrderStatus, Portfolio, Side, Trade
 from backtester.strategy import MultiAssetStrategy, Signal
@@ -73,6 +74,7 @@ class MultiAssetBacktestEngine:
         fills: list[Fill] = []
         order_events: list[OrderEvent] = []
         pending_orders: list[Order] = []
+        peak_closes: dict[str, float] = {}
 
         for current_index in range(len(shared_index)):
             timestamp = cast(datetime, timestamps[current_index])
@@ -100,12 +102,29 @@ class MultiAssetBacktestEngine:
 
             for ticker in self._config.tickers:
                 signal = signals.get(ticker, Signal.HOLD)
+                reason = ""
+                position = portfolio.get_position(ticker)
+                if position is None:
+                    peak_closes.pop(ticker, None)
+                else:
+                    close = current_prices[ticker]
+                    peak = max(peak_closes.get(ticker, 0.0), position.avg_entry_price, close)
+                    peak_closes[ticker] = peak
+                    exit_reason = risk_exit_reason(
+                        self._config,
+                        entry_price=position.avg_entry_price,
+                        peak_close=peak,
+                        close=close,
+                    )
+                    if exit_reason is not None and signal is not Signal.SELL:
+                        signal, reason = Signal.SELL, exit_reason
                 decision = Decision(
                     decision_id=f"D{current_index:08d}-{ticker}",
                     ticker=ticker,
                     signal=signal.name,
                     decision_time=timestamp,
                     information_cutoff=timestamp,
+                    reason=reason,
                 )
                 decisions.append(decision)
                 order = self._signal_to_order(
@@ -174,6 +193,15 @@ class MultiAssetBacktestEngine:
         fills: list[Fill],
         order_events: list[OrderEvent],
     ) -> None:
+        # Buys are sized at the decision close but fill at a later price. When a
+        # gap makes the order unaffordable, fill what cash covers instead of
+        # silently dropping the position.
+        reason = ""
+        if order.side is Side.BUY:
+            affordable = portfolio.affordable_quantity(reference_price, self._config.slippage_bps)
+            if 0 < affordable < order.quantity:
+                reason = f"Quantity reduced from {order.quantity} to {affordable} to fit available cash."
+                order = replace(order, quantity=affordable)
         trade = portfolio.execute_order(
             order,
             reference_price,
@@ -197,7 +225,7 @@ class MultiAssetBacktestEngine:
                 filled_at=trade.timestamp,
             )
         )
-        order_events.append(OrderEvent(order.order_id, OrderStatus.FILLED, timestamp))
+        order_events.append(OrderEvent(order.order_id, OrderStatus.FILLED, timestamp, reason))
 
     def _load_and_align_data(self) -> dict[str, pd.DataFrame]:
         raw_data = {

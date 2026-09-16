@@ -200,7 +200,7 @@ def test_rule_based_draft_rejects_unsupported_indicator_and_operator() -> None:
                             {
                                 "left": {"name": "close"},
                                 "operator": ">",
-                                "right": {"name": "rsi", "window": 14},
+                                "right": {"name": "vwap", "window": 14},
                             }
                         ],
                         "exit": [

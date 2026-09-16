@@ -1,7 +1,8 @@
 "use client";
 
 import { CheckCircle2, ClipboardList, HelpCircle } from "lucide-react";
-import type { ConditionSpec, IndicatorSpec, StrategyCompileResponse, StrategyDraft } from "../../lib/types";
+import { conditionLabel } from "../../lib/rules";
+import type { ConditionSpec, StrategyCompileResponse, StrategyDraft } from "../../lib/types";
 import { formatCurrency, formatDecimal, formatNumber } from "../formatters";
 import { StrategyAssumptions } from "./StrategyAssumptions";
 import { StrategyUnsupportedState } from "./StrategyUnsupportedState";
@@ -37,16 +38,6 @@ function gridLabel(values: Record<string, number[]> | null | undefined): string 
     .join(" / ");
 }
 
-function indicatorLabel(indicator: IndicatorSpec): string {
-  if (indicator.name === "close") return "close";
-  const suffix = indicator.num_std ? `, ${indicator.num_std} std` : "";
-  return `${indicator.name.replaceAll("_", " ")}(${indicator.window}${suffix})`;
-}
-
-function conditionLabel(condition: ConditionSpec): string {
-  return `${indicatorLabel(condition.left)} ${condition.operator} ${indicatorLabel(condition.right)}`;
-}
-
 function ruleListLabel(conditions: ConditionSpec[] | undefined, joiner: string): string {
   if (!conditions || conditions.length === 0) return "Not specified";
   return conditions.map(conditionLabel).join(` ${joiner} `);
@@ -77,6 +68,15 @@ function strategyInterpretation(draft: StrategyDraft): { entry: string; exit: st
       entry: "Close reaches or falls below the lower rolling band.",
       exit: "Close reaches or rises above the upper rolling band."
     };
+  }
+  if (draft.strategy_kind === "rsi_reversion") {
+    return { entry: "RSI crosses down into the oversold level.", exit: "RSI reaches the overbought level." };
+  }
+  if (draft.strategy_kind === "donchian_breakout") {
+    return { entry: "Close breaks above the prior entry-window high.", exit: "Close breaks below the prior exit-window low." };
+  }
+  if (draft.strategy_kind === "macd_crossover") {
+    return { entry: "MACD line crosses above its signal line.", exit: "MACD line crosses below its signal line." };
   }
   if (draft.strategy_kind === "rule_based") {
     return {

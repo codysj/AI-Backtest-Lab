@@ -1,4 +1,10 @@
-export type StrategyId = "momentum" | "mean_reversion" | "rule_based";
+export type StrategyId =
+  | "momentum"
+  | "mean_reversion"
+  | "rsi_reversion"
+  | "donchian_breakout"
+  | "macd_crossover"
+  | "rule_based";
 export type ResearchStrategyId = Exclude<StrategyId, "rule_based">;
 
 export type PositionSizeMethod =
@@ -16,6 +22,7 @@ export type StrategyParameter = {
   default: number;
   min: number;
   label: string;
+  grid?: number[];
 };
 
 export type StrategyMetadata = {
@@ -25,7 +32,13 @@ export type StrategyMetadata = {
   parameters: StrategyParameter[];
 };
 
-export type BacktestRequest = {
+export type RiskExitSettings = {
+  stop_loss_pct?: number | null;
+  take_profit_pct?: number | null;
+  trailing_stop_pct?: number | null;
+};
+
+export type BacktestRequest = RiskExitSettings & {
   ticker: string;
   start_date: string;
   end_date: string;
@@ -81,7 +94,10 @@ export type IndicatorName =
   | "rolling_high"
   | "rolling_low"
   | "bollinger_upper"
-  | "bollinger_lower";
+  | "bollinger_lower"
+  | "ema"
+  | "rsi"
+  | "value";
 
 export type ConditionOperator = ">" | "<" | ">=" | "<=" | "crosses_above" | "crosses_below";
 
@@ -89,6 +105,7 @@ export type IndicatorSpec = {
   name: IndicatorName;
   window?: number | null;
   num_std?: number | null;
+  value?: number | null;
 };
 
 export type ConditionSpec = {

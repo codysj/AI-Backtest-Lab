@@ -19,6 +19,7 @@ type ResearchCopilotPanelProps = {
 const exampleGoals = [
   "Optimize AAPL from 2018 to 2024 using a 20/100 SMA crossover",
   "Walk-forward AAPL from 2019 to 2024 using a 10/50 SMA crossover",
+  "Walk-forward MSFT from 2018 to 2024 using a MACD crossover",
   "Run MSFT from 2020 to 2023 using mean reversion with a 20 day window and 2 standard deviations"
 ];
 

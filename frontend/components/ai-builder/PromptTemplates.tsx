@@ -6,7 +6,7 @@ const templates = [
   "Mean reversion on MSFT",
   "Optimize SMA windows",
   "Walk-forward validate momentum",
-  "Compare against SPY benchmark"
+  "Grid search an RSI strategy on NVDA from 2019 to 2023"
 ];
 
 type PromptTemplatesProps = {

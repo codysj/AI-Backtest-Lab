@@ -7,11 +7,15 @@ from typing import Literal
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from backtester.engine import ExecutionPolicy, PositionSizeMethod
+from backtester.strategy.registry import STRATEGIES
 from backtester.strategy.rule_schema import RuleBasedStrategySpec
 
 
-StrategyId = Literal["momentum", "mean_reversion", "rule_based"]
-ResearchStrategyId = Literal["momentum", "mean_reversion"]
+# Kept as literals so OpenAPI and the frontend see a closed set; a test asserts
+# they match backtester.strategy.registry.STRATEGIES.
+ResearchStrategyId = Literal["momentum", "mean_reversion", "rsi_reversion", "donchian_breakout", "macd_crossover"]
+StrategyId = Literal["momentum", "mean_reversion", "rsi_reversion", "donchian_breakout", "macd_crossover", "rule_based"]
+RiskExitPct = Field(default=None, gt=0, lt=1)
 ParameterType = Literal["integer", "number"]
 OptimizationMetric = Literal[
     "total_return",
@@ -33,6 +37,7 @@ class StrategyParameterSchema(BaseModel):
     default: int | float
     min: int | float
     label: str
+    grid: list[int | float] = Field(default_factory=list)
 
 
 class StrategyMetadata(BaseModel):
@@ -67,8 +72,11 @@ class BacktestRequest(BaseModel):
     commission_rate: float = Field(default=0.001, ge=0)
     slippage_bps: float = Field(default=5.0, ge=0)
     execution_policy: ExecutionPolicy = ExecutionPolicy.CLOSE_SIGNAL_NEXT_OPEN
-    position_size_method: PositionSizeMethod = PositionSizeMethod.FIXED_DOLLAR
-    position_size_value: float = Field(default=10_000.0, gt=0)
+    position_size_method: PositionSizeMethod = PositionSizeMethod.PERCENT_EQUITY
+    position_size_value: float = Field(default=0.95, gt=0)
+    stop_loss_pct: float | None = RiskExitPct
+    take_profit_pct: float | None = RiskExitPct
+    trailing_stop_pct: float | None = RiskExitPct
     benchmark: bool = True
     parameters: dict[str, int | float] = Field(default_factory=dict)
     rule_spec: RuleBasedStrategySpec | None = None
@@ -94,27 +102,7 @@ class BacktestRequest(BaseModel):
             msg = "rule_spec is only supported for rule_based strategy."
             raise ValueError(msg)
 
-        if self.strategy == "momentum":
-            fast_window = int(params.get("fast_window", 10))
-            slow_window = int(params.get("slow_window", 50))
-            if fast_window <= 0:
-                msg = "fast_window must be positive."
-                raise ValueError(msg)
-            if slow_window <= 0:
-                msg = "slow_window must be positive."
-                raise ValueError(msg)
-            if fast_window >= slow_window:
-                msg = "fast_window must be less than slow_window."
-                raise ValueError(msg)
-        if self.strategy == "mean_reversion":
-            window = int(params.get("window", 20))
-            num_std = float(params.get("num_std", 2.0))
-            if window <= 0:
-                msg = "window must be positive."
-                raise ValueError(msg)
-            if num_std <= 0:
-                msg = "num_std must be positive."
-                raise ValueError(msg)
+        STRATEGIES[self.strategy].build(params)
         return self
 
 
@@ -128,8 +116,11 @@ class ResearchBaseRequest(BaseModel):
     commission_rate: float = Field(default=0.001, ge=0)
     slippage_bps: float = Field(default=5.0, ge=0)
     execution_policy: ExecutionPolicy = ExecutionPolicy.CLOSE_SIGNAL_NEXT_OPEN
-    position_size_method: PositionSizeMethod = PositionSizeMethod.FIXED_DOLLAR
-    position_size_value: float = Field(default=10_000.0, gt=0)
+    position_size_method: PositionSizeMethod = PositionSizeMethod.PERCENT_EQUITY
+    position_size_value: float = Field(default=0.95, gt=0)
+    stop_loss_pct: float | None = RiskExitPct
+    take_profit_pct: float | None = RiskExitPct
+    trailing_stop_pct: float | None = RiskExitPct
     benchmark: bool = True
     strategy: ResearchStrategyId
     parameter_grid: dict[str, list[int | float]] = Field(default_factory=dict)
@@ -159,7 +150,7 @@ class ResearchBaseRequest(BaseModel):
                     msg = f"parameter_grid.{name} values must be positive."
                     raise ValueError(msg)
 
-        expected = {"fast_window", "slow_window"} if self.strategy == "momentum" else {"window", "num_std"}
+        expected = STRATEGIES[self.strategy].parameter_names
         provided = set(self.parameter_grid)
         unexpected = provided - expected
         missing = expected - provided
@@ -260,6 +251,7 @@ class DecisionSchema(BaseModel):
     signal: str
     decision_time: str
     information_cutoff: str
+    reason: str = ""
 
 
 class OrderSchema(BaseModel):

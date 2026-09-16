@@ -2,7 +2,7 @@
 name = "backtester"
 version = "0.1.0"
 description = "Event-driven strategy backtesting engine."
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 dependencies = [
     "fastapi",
     "httpx",
@@ -33,7 +33,7 @@ dev = [
 testpaths = ["tests"]
 
 [tool.mypy]
-python_version = "3.11"
+python_version = "3.12"
 strict = true
 ignore_missing_imports = true
 

@@ -78,6 +78,8 @@ BACKTESTER_CORS_ORIGINS=http://localhost:3000,http://localhost:3001
   - Current run context, API status, reset/default controls, docs/GitHub links.
 - `components/BacktestForm.tsx`
   - Controlled single-asset backtest form with inline validation display.
+- `components/RiskExitFields.tsx`
+  - Optional stop-loss, take-profit, and trailing-stop inputs shared by all workflow forms.
 - `components/ResearchForms.tsx`
   - Controlled grid-search and walk-forward forms with range inputs, optimization metrics, and fold windows.
 - `components/ai-builder/`
@@ -107,7 +109,9 @@ BACKTESTER_CORS_ORIGINS=http://localhost:3000,http://localhost:3001
 - `lib/exports.ts`
   - Frontend CSV/JSON downloads from returned API data.
 - `lib/defaults.ts`
-  - Default AAPL Momentum SMA request and fallback strategy metadata.
+  - Default AAPL Momentum SMA request and fallback metadata used until `GET /api/strategies` responds.
+- `lib/rules.ts`
+  - Human-readable labels for rule DSL conditions.
 - `lib/validation.ts`
   - Client-side validation for form UX.
 
@@ -130,12 +134,6 @@ The AI Builder endpoints return inert draft and compiled request JSON only. The 
 Research Copilot uses request/response state passing. The plan call never executes a workflow; approval requires a user click and sends the prior state plus one matching action. The browser displays backend-provided analysis and can load compiled payloads into existing forms without auto-running them.
 AI provider selection and API keys are handled only by the FastAPI backend. The browser never sends or receives provider credentials.
 
-## Screenshot / GIF Workflow
+## Screenshots And GIF
 
-For portfolio assets, start the API and frontend, then capture:
-
-- Single Run after the default AAPL backtest completes.
-- Grid Search after the default sweep shows the leaderboard and heatmap.
-- Walk-Forward after the fold table and aggregate summary render.
-
-Keep committed assets small and intentional.
+README media in `docs/demos/` is generated from the running app. Start the API, run `npm run build && npm run start`, then run `python scripts/capture_demo_media.py` from the repo root.

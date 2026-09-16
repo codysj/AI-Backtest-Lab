@@ -1,39 +1,30 @@
 # Benchmark Results
 
-Benchmarks are intentionally reproducible and do not require network access by default.
-
-Run the synthetic benchmark:
+The benchmark runs offline on synthetic OHLCV data with `MomentumStrategy(10/50)`, zero costs, and $10,000 fixed-dollar sizing.
 
 ```bash
-python benchmarks/benchmark_backtest.py
-```
-
-Run a DataLoader/yfinance benchmark:
-
-```bash
-python benchmarks/benchmark_backtest.py --real --ticker AAPL --start 2010-01-01 --end 2024-01-01
-```
-
-Run the profiler:
-
-```bash
+python benchmarks/benchmark_backtest.py --bars 2500
 python benchmarks/profile_backtest.py
 ```
 
-## Results
+## Current engine
 
-The original sliced-DataFrame baseline must be measured from a pre-Stage-7 commit or reconstructed branch. The current optimized implementation uses full DataFrame access with `current_index`, precomputed strategy indicators, and NumPy close-price access in the engine loop.
+Measured 2026-09-16 on Windows 11, Python 3.12.10, AMD64 with 20 logical cores.
 
-Latest measured local run on Windows with Python 3.14.0, synthetic 2,500-bar OHLCV data, `MomentumStrategy(10/50)`, zero commission, and zero slippage:
+| Bars | Seconds | Bars per second |
+| --- | --- | --- |
+| 1,000 | 0.137 | 7,297 |
+| 2,500 | 0.358 | 6,992 |
+| 5,000 | 0.899 | 5,561 |
 
-| Version | Time | Throughput | Speedup |
-|---------|------|------------|---------|
-| Baseline sliced DataFrame | TODO: measure from pre-optimization commit | TODO | 1.0x |
-| Precomputed indicators + NumPy hot loop | 0.019221 s | 130,064.72 bars/sec | TODO: compare to baseline |
+A 2,500-bar run covers about ten years of daily data. At under half a second per run, a 27-combination grid search over that period finishes in about ten seconds.
 
-Latest cProfile synthetic run:
+## Why throughput falls as runs get longer
 
-- Total calls: 55,313
-- Total time: 0.017 s
-- Top cumulative function: `BacktestEngine.run`
-- Main hot-loop strategy cost: `MomentumStrategy.generate_signal`
+Each bar, the engine copies history up to the current bar and hands the strategy that copy. This makes look-ahead structurally impossible, as described in the [execution-timing decision](decisions/2026-09-16-close-signal-next-open-execution.md). The copy grows with the bar index, so total work grows faster than linearly.
+
+An earlier version passed the full DataFrame with an index and reached about 130,000 bars per second. It relied on strategies not reading future rows. That number is not comparable, because the fast version could not guarantee what the current one does.
+
+## Next step
+
+A read-only market view with a bounded length would drop the per-bar copy while keeping the guarantee. Any optimization should be accepted only if every registered strategy still produces identical decision, order, and fill ledgers.
