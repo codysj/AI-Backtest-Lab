@@ -2,11 +2,14 @@
 
 ## Next
 
-1. **Reference fixtures.** Add hand-calculated cases with gaps, splits, and dividends, and a deliberately simple reference simulator to reconcile ledgers against.
-2. **Read-only market view.** Replace the per-bar history copy with a bounded view so throughput stays flat as runs grow. Accept it only if ledgers still match the reference simulator.
-3. **Dividend-aware returns.** Load adjusted closes or dividends and use them for both strategy and benchmark returns.
-4. **Multi-asset in the API and dashboard.** First define shared-cash allocation, union calendars, and stale-price valuation, since the Python engine currently intersects calendars and fills in ticker order.
-5. **Hosted demo.** Deploy the dashboard and API with a pre-seeded data cache and the offline AI provider, so no key or network access is needed.
+Full designs, acceptance criteria, and open decisions are in the [technical roadmap](technical-roadmap.md).
+
+1. **Hosted live demo.** Per-ticker data cache, offline mode, Docker API deploy, Vercel frontend, request limits.
+2. **Verified engine speedup.** Reference fixtures and simulator, read-only market view, incremental indicators, identical ledgers.
+3. **Overfitting statistics.** Bootstrap Sharpe intervals, deflated Sharpe ratio, probability of backtest overfitting, locked holdout.
+4. **Multi-asset portfolio research.** Allocators, rebalancing, union calendars, portfolio API and dashboard mode.
+5. **Persisted research jobs.** SQLite-backed async runs with progress, idempotency, recovery, and replay.
+6. **Polish bundle.** Playwright tests in CI, trade markers with exit reasons, dividend-aware returns.
 
 ## Decided
 
