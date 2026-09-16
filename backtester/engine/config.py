@@ -40,6 +40,8 @@ class BacktestConfig:
     stop_loss_pct: float | None = None
     take_profit_pct: float | None = None
     trailing_stop_pct: float | None = None
+    # Bars before this ISO date only warm up indicators: no orders, no equity.
+    evaluation_start: str | None = None
 
     def __post_init__(self) -> None:
         normalized_ticker = self.ticker.strip().upper()
@@ -69,6 +71,9 @@ class BacktestConfig:
             msg = "volatility_window must be greater than 1."
             raise ValueError(msg)
         _validate_risk_exits(self.stop_loss_pct, self.take_profit_pct, self.trailing_stop_pct)
+        if self.evaluation_start is not None and not self.start_date <= self.evaluation_start <= self.end_date:
+            msg = "evaluation_start must fall between start_date and end_date."
+            raise ValueError(msg)
 
 
 @dataclass(frozen=True)

@@ -33,7 +33,7 @@ export function RiskExitFields({ value, errors, onChange }: RiskExitFieldsProps)
                 type="number"
                 min={0.1}
                 max={99}
-                step={0.5}
+                step="any"
                 placeholder="off"
                 value={fraction == null ? "" : Number((fraction * 100).toFixed(4))}
                 onChange={(event) =>

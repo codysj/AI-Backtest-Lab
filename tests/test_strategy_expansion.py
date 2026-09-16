@@ -164,3 +164,38 @@ def test_fake_provider_drafts_and_compiles_new_strategy_kinds() -> None:
     assert compiled.payload is not None
     assert compiled.payload["strategy"] == "rsi_reversion"
     assert set(compiled.payload["parameter_grid"]) == {"window", "oversold", "overbought"}
+
+
+def test_evaluation_start_warms_indicators_without_trading_or_scoring() -> None:
+    data = random_walk(160, seed=2)  # crossovers at bars 109-146, inside the evaluation window
+    start = str(data.index[100].date())
+    strategy_factory = lambda: STRATEGIES["momentum"].build({"fast_window": 5, "slow_window": 50})  # noqa: E731
+    cold_config = BacktestConfig(ticker="T", start_date=start, end_date="2030-01-01")
+    warm_config = BacktestConfig(ticker="T", start_date="2020-01-01", end_date="2030-01-01", evaluation_start=start)
+
+    cold = BacktestEngine(FakeLoader(data.loc[start:]), strategy_factory(), cold_config).run()
+    warm = BacktestEngine(FakeLoader(data), strategy_factory(), warm_config).run()
+
+    assert warm.equity_curve.index[0] == data.index[100]
+    assert len(warm.equity_curve) == len(cold.equity_curve) == 60
+    assert all(fill.filled_at >= data.index[100] for fill in warm.fills)
+    # Warm-up signals match an uninterrupted run over the same bars; a cold start does not.
+    full = BacktestEngine(FakeLoader(data), strategy_factory(), BacktestConfig(ticker="T", start_date="2020-01-01", end_date="2030-01-01")).run()
+    full_signals = [d.signal for d in full.decisions[100:]]
+    assert [d.signal for d in warm.decisions] == full_signals
+    assert [d.signal for d in cold.decisions] != full_signals
+    with pytest.raises(ValueError, match="evaluation_start"):
+        BacktestConfig(ticker="T", start_date="2020-01-01", end_date="2020-06-01", evaluation_start="2021-01-01")
+
+
+def test_gap_up_fill_is_clipped_to_available_cash() -> None:
+    data = make_ohlcv_df([100.0, 120.0, 120.0], open_prices=[100.0, 120.0, 120.0])
+    config = BacktestConfig(ticker="T", start_date="2020-01-01", end_date="2020-12-31", slippage_bps=5)
+    result = BacktestEngine(FakeLoader(data), BuyOnceStrategy(), config).run()
+
+    assert result.orders[0].quantity == 950  # sized at the 100 close
+    assert len(result.fills) == 1
+    filled = result.fills[0]
+    assert filled.quantity < 950
+    assert filled.quantity * filled.price + filled.commission <= config.initial_cash
+    assert "reduced" in result.order_events[-1].reason

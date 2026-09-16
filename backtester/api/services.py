@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date, datetime
 from numbers import Real
 from typing import cast
@@ -279,7 +279,11 @@ def run_walk_forward_from_request(request: WalkForwardRequest) -> WalkForwardRes
         if best_train is None:
             warnings.append("No valid training combination was available for this fold.")
         else:
-            test_frame = _run_grid_frame_for_params(request, test_start, test_end, static_loader, best_train.parameters)
+            # The test fold warms indicators on the preceding training bars but
+            # only trades and scores from test_start onward.
+            test_frame = _run_grid_frame_for_params(
+                request, train_start, test_end, static_loader, best_train.parameters, evaluation_start=test_start
+            )
             test_rows = _rows_from_frame(test_frame, metric, max_results=1)
             test_row = test_rows[0] if test_rows else None
             degradation = _degradation_ratio(_metric_value(best_train, metric), _metric_value(test_row, metric) if test_row else None)
@@ -372,9 +376,10 @@ def _run_grid_frame_for_params(
     end_date: str,
     loader: DataLoader,
     parameters: dict[str, int | float],
+    evaluation_start: str | None = None,
 ) -> pd.DataFrame:
     one_value_grid = {key: [value] for key, value in parameters.items()}
-    config = _backtest_config_from_research_request(request, start_date, end_date)
+    config = replace(_backtest_config_from_research_request(request, start_date, end_date), evaluation_start=evaluation_start)
     return run_grid_search(
         loader=loader,
         strategy_factory=_strategy_factory(request.strategy),

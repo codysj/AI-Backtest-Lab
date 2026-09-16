@@ -76,6 +76,15 @@ class Portfolio:
             return self._execute_buy(trade)
         return self._execute_sell(trade)
 
+    def affordable_quantity(self, fill_price: float, slippage_bps: float) -> int:
+        """Largest whole-share BUY that current cash covers after slippage and commission."""
+        unit_cost = self._apply_slippage(fill_price, Side.BUY, slippage_bps) + self._commission_rate
+        quantity = int(self._cash // unit_cost) if unit_cost > 0 else 0
+        # Floor division on floats can overshoot by one share at the cent boundary.
+        while quantity > 0 and quantity * unit_cost > self._cash:
+            quantity -= 1
+        return quantity
+
     def total_value(self, current_prices: dict[str, float]) -> float:
         total = self._cash
         for ticker, position in self._positions.items():

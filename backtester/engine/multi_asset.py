@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime
 from typing import cast
 
@@ -193,6 +193,15 @@ class MultiAssetBacktestEngine:
         fills: list[Fill],
         order_events: list[OrderEvent],
     ) -> None:
+        # Buys are sized at the decision close but fill at a later price. When a
+        # gap makes the order unaffordable, fill what cash covers instead of
+        # silently dropping the position.
+        reason = ""
+        if order.side is Side.BUY:
+            affordable = portfolio.affordable_quantity(reference_price, self._config.slippage_bps)
+            if 0 < affordable < order.quantity:
+                reason = f"Quantity reduced from {order.quantity} to {affordable} to fit available cash."
+                order = replace(order, quantity=affordable)
         trade = portfolio.execute_order(
             order,
             reference_price,
@@ -216,7 +225,7 @@ class MultiAssetBacktestEngine:
                 filled_at=trade.timestamp,
             )
         )
-        order_events.append(OrderEvent(order.order_id, OrderStatus.FILLED, timestamp))
+        order_events.append(OrderEvent(order.order_id, OrderStatus.FILLED, timestamp, reason))
 
     def _load_and_align_data(self) -> dict[str, pd.DataFrame]:
         raw_data = {
