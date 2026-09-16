@@ -88,6 +88,9 @@ export function GridSearchResults({ result, isLoading, error, onRunSelected }: G
         execution_policy: (result.config.execution_policy ?? "CLOSE_SIGNAL_NEXT_OPEN") as BacktestRequest["execution_policy"],
         position_size_method: result.config.position_size_method as BacktestRequest["position_size_method"],
         position_size_value: Number(result.config.position_size_value),
+        stop_loss_pct: (result.config.stop_loss_pct as number | null | undefined) ?? null,
+        take_profit_pct: (result.config.take_profit_pct as number | null | undefined) ?? null,
+        trailing_stop_pct: (result.config.trailing_stop_pct as number | null | undefined) ?? null,
         benchmark: Boolean(result.config.benchmark),
         parameters: selectedRow.parameters
       } satisfies BacktestRequest)

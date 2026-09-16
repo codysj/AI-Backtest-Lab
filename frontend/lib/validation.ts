@@ -1,6 +1,22 @@
-import type { BacktestRequest, GridSearchRequest, StrategyMetadata, WalkForwardRequest } from "./types";
+import type { BacktestRequest, GridSearchRequest, RiskExitSettings, StrategyMetadata, WalkForwardRequest } from "./types";
 
 export type FormErrors = Partial<Record<string, string>>;
+
+function validateSizingAndExits(
+  request: RiskExitSettings & { position_size_method: string; position_size_value: number },
+  errors: FormErrors
+) {
+  const fractional = request.position_size_method === "PERCENT_EQUITY" || request.position_size_method === "VOLATILITY_TARGET";
+  if (fractional && request.position_size_value > 1) {
+    errors.position_size_value = "Use a fraction between 0 and 1 for this sizing method.";
+  }
+  (["stop_loss_pct", "take_profit_pct", "trailing_stop_pct"] as const).forEach((key) => {
+    const value = request[key];
+    if (value != null && (!Number.isFinite(value) || value <= 0 || value >= 1)) {
+      errors[key] = "Enter a percent between 0 and 100.";
+    }
+  });
+}
 
 export function validateBacktestRequest(request: BacktestRequest, strategy?: StrategyMetadata): FormErrors {
   const errors: FormErrors = {};
@@ -52,6 +68,7 @@ export function validateBacktestRequest(request: BacktestRequest, strategy?: Str
       errors["parameters.slow_window"] = "Slow window must be greater than fast window.";
     }
   }
+  validateSizingAndExits(request, errors);
   if (request.strategy === "rule_based" && !request.rule_spec) {
     errors.rule_spec = "Rule-based strategies require a generated rule spec.";
   }
@@ -122,13 +139,6 @@ function validateResearchBase(request: GridSearchRequest | WalkForwardRequest): 
       errors["parameter_grid.fast_window"] = "At least one fast window must be less than a slow window.";
     }
   }
-  if (request.strategy === "mean_reversion") {
-    if ((request.parameter_grid.window ?? []).length === 0) {
-      errors["parameter_grid.window"] = "Windows are required.";
-    }
-    if ((request.parameter_grid.num_std ?? []).length === 0) {
-      errors["parameter_grid.num_std"] = "Standard deviation values are required.";
-    }
-  }
+  validateSizingAndExits(request, errors);
   return errors;
 }

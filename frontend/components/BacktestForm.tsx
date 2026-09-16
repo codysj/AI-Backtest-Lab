@@ -2,8 +2,10 @@
 
 import { Play, RotateCcw, SlidersHorizontal } from "lucide-react";
 import { useMemo } from "react";
-import type { BacktestRequest, ConditionSpec, ExecutionPolicy, IndicatorSpec, PositionSizeMethod, StrategyId, StrategyMetadata } from "../lib/types";
+import { conditionLabel } from "../lib/rules";
+import type { BacktestRequest, ExecutionPolicy, PositionSizeMethod, StrategyId, StrategyMetadata } from "../lib/types";
 import type { FormErrors } from "../lib/validation";
+import { RiskExitFields } from "./RiskExitFields";
 
 type BacktestFormProps = {
   request: BacktestRequest;
@@ -19,8 +21,8 @@ const methodOptions: { value: PositionSizeMethod; label: string; helper: string 
   { value: "FIXED_DOLLAR", label: "Fixed dollar", helper: "Allocate a dollar amount per signal." },
   { value: "FIXED_QUANTITY", label: "Fixed quantity", helper: "Buy or sell a fixed share count." },
   { value: "ALL_IN", label: "All in", helper: "Use available cash on buy signals." },
-  { value: "PERCENT_EQUITY", label: "Percent equity", helper: "Size each trade as a portfolio percent." },
-  { value: "VOLATILITY_TARGET", label: "Volatility target", helper: "Scale position sizing by volatility." }
+  { value: "PERCENT_EQUITY", label: "Percent equity", helper: "Fraction of equity per buy, e.g. 0.95." },
+  { value: "VOLATILITY_TARGET", label: "Volatility target", helper: "Daily risk fraction scaled by realized volatility." }
 ];
 
 function FieldError({ message }: { message?: string }) {
@@ -37,16 +39,6 @@ function SectionHeading({ title, kicker }: { title: string; kicker?: string }) {
       {kicker ? <p className="mt-1 text-xs leading-5 text-lab-muted">{kicker}</p> : null}
     </div>
   );
-}
-
-function indicatorLabel(indicator: IndicatorSpec): string {
-  if (indicator.name === "close") return "close";
-  const suffix = indicator.num_std ? `, ${indicator.num_std} std` : "";
-  return `${indicator.name.replaceAll("_", " ")}(${indicator.window}${suffix})`;
-}
-
-function conditionLabel(condition: ConditionSpec): string {
-  return `${indicatorLabel(condition.left)} ${condition.operator} ${indicatorLabel(condition.right)}`;
 }
 
 export function BacktestForm({
@@ -257,6 +249,8 @@ export function BacktestForm({
           </label>
         </div>
       </div>
+
+      <RiskExitFields value={request} errors={errors} onChange={(exits) => onChange({ ...request, ...exits })} />
 
       <div className="rounded-xl border border-lab-border bg-lab-surface p-4">
         <SectionHeading title="Costs" />
